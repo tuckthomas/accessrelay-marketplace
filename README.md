@@ -6,7 +6,7 @@ The application, controller engine and desktop interface stay in
 [accessrelay-studio](https://github.com/tuckthomas/accessrelay-studio).
 
 Open **Marketplace** in Studio to browse, inspect source and install a package.
-Installed packages appear under **Controller → Plugins**. Creating a controller
+Installed packages appear under **Controller â†’ Plugins**. Creating a controller
 profile and enabling its scripts are separate user actions.
 
 ## Contribute
@@ -21,8 +21,9 @@ profile and enabling its scripts are separate user actions.
    are immutable; publish a new version for changes.
 
 Catalog schema: `schemaVersion: 1`, `entries: []`. Every listing includes `id`,
-`name`, `description`, `author`, `version`, `kind` (`script` or `plugin`), `license`,
-`manifestPath`, `manifestSha256`, and `tags`. Paths use
+`name`, `description`, `author`, `version`, `kind` (`script`, `controller-profile`, `plugin`, or `training-plugin`), `license`,
+`manifestPath`, `manifestSha256`, and `tags`. Game-specific new listings also use
+`gameId`, matching the manifest. Paths use
 `packages/<id>/<version>/pack.json`. Listings and manifests must agree on identity,
 version, name and license.
 
@@ -31,8 +32,14 @@ format. Game plugins can add declarative tuning/bindings and supported typed vis
 resources. This does not load arbitrary native DLLs, JavaScript UI, Python code or
 new model runtimes. Host API changes belong in the application repository.
 
-The catalog includes the NBA 2K27 package. In Studio, its Open training action
-opens AI Model Training with NBA 2K27 selected; controller scripts can be installed
-separately. Training and live UI use the reviewed NBA adapter bundled with Studio.
-The package contains no trained model weights. The earlier sample packages are
-unlisted; published versioned sources remain available in repository history.
+The catalog contains separate **NBA 2K27 Model Training** and **NBA 2K27 Rhythm
+Script** packages. The training package declares `gameId: nba2k27` and the reviewed
+`trainingAdapter: nba2k27-training-v1`. Studio enables its NBA workspace only after
+installation. The controller script cannot enable that workspace. The package
+contains no trained tracker or release-model weights.
+
+Training captures keep the gameplay scene (court, player, moving meter and room
+above the floor) plus the fixed shot feedback HUD and synchronized controller input.
+Player and meter tracking must be trained and validated from this evidence; a
+full-scene overview is not a release-model player crop. The earlier sample packages
+remain unlisted. Published versioned sources are immutable.

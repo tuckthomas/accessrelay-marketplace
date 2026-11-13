@@ -14,7 +14,7 @@ for item in catalog['entries']:
     identity = (item['id'], item['version'])
     assert identity not in seen
     seen.add(identity)
-    assert item['kind'] in ('script', 'plugin')
+    assert item['kind'] in ('script', 'plugin', 'controller-profile', 'training-plugin')
     assert item['manifestPath'] == f"packages/{item['id']}/{item['version']}/pack.json"
     path = root / item['manifestPath']
     assert hashlib.sha256(path.read_bytes()).hexdigest() == item['manifestSha256']
@@ -22,6 +22,10 @@ for item in catalog['entries']:
     assert manifest['schemaVersion'] == manifest['apiVersion'] == 1
     for key in ('id', 'version', 'name', 'license'):
         assert item[key] == manifest[key], key
+    assert item.get('gameId', '') == manifest.get('gameId', '')
+    assert (item['kind'] == 'training-plugin') == (manifest.get('trainingAdapter', 'none') != 'none')
+    if item['kind'] == 'training-plugin':
+        assert manifest['gameId'] and not manifest['bindings']
     assert len(manifest['assets']) <= 40
     for asset in manifest['assets']:
         parts = Path(asset['path']).parts

@@ -2,21 +2,39 @@
   "schemaVersion": 1,
   "entries": [
     {
-      "id": "nba2k27",
-      "name": "NBA 2K27",
-      "description": "NBA 2K27 shot profiles, gameplay training capture and live assistance in Studio. Includes optional controller scripts. A trained model must be created from gameplay clips.",
+      "id": "nba2k27-training",
+      "name": "NBA 2K27 Model Training",
+      "description": "NBA 2K27 shot profiles, gameplay evidence recording, clip review and model integration. No trained model weights are included.",
       "author": "AccessRelay",
       "version": "1.0.0",
-      "kind": "plugin",
+      "kind": "training-plugin",
+      "gameId": "nba2k27",
       "license": "0BSD",
-      "manifestPath": "packages/nba2k27/1.0.0/pack.json",
-      "manifestSha256": "7515aa8c118d321fcfe167ba867b6bf7d061ce298ca90d5525774a421a94dfa4",
+      "manifestPath": "packages/nba2k27-training/1.0.0/pack.json",
+      "manifestSha256": "a2a07c154b0c0cc85d3f702fb51a59dae67238a264e8f4a37798d7c192594943",
+      "tags": [
+        "nba2k27",
+        "training",
+        "vision"
+      ]
+    },
+    {
+      "id": "nba2k27",
+      "name": "NBA 2K27 Rhythm Script",
+      "description": "Optional NBA 2K27 rhythm controller script. Training is provided by the separate NBA 2K27 Model Training plugin.",
+      "author": "AccessRelay",
+      "version": "1.0.1",
+      "kind": "script",
+      "license": "0BSD",
+      "manifestPath": "packages/nba2k27/1.0.1/pack.json",
+      "manifestSha256": "d7d0fc6d9c2fe5554d32189c271724d11c98be9bae16cbd0206bd93bdcc02be7",
       "tags": [
         "nba2k27",
         "training",
         "vision",
         "controller"
-      ]
+      ],
+      "gameId": "nba2k27"
     }
   ]
 }
