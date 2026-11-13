@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "apiVersion": 1,
+  "id": "switch-access-kit",
+  "version": "1.0.0",
+  "name": "Switch access kit",
+  "description": "A game-neutral switch-access plugin with adjustable A-button pulse duration.",
+  "license": "0BSD",
+  "visionAdapter": "none",
+  "assets": [
+    {
+      "path": "scripts/press.lua",
+      "kind": "lua",
+      "bytes": 69,
+      "sha256": "88c872be5a19ecab8a731647f8464de4f0b1924073b90cec09d6d0de375a43a6"
+    }
+  ],
+  "bindings": [
+    {
+      "control": "rightBumper",
+      "script": "scripts/press.lua",
+      "consume": true
+    }
+  ],
+  "tuning": [
+    {
+      "id": "press-ms",
+      "label": "A press duration",
+      "kind": "range",
+      "minimum": 40,
+      "maximum": 300,
+      "step": 1,
+      "default": 150,
+      "choices": []
+    }
+  ],
+  "presets": [
+    {
+      "name": "Default",
+      "values": {
+        "press-ms": 150
+      }
+    }
+  ]
+}

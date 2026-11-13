@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "id": "a-button-pulse",
+      "name": "A button pulse",
+      "description": "Turn a right-bumper press into a short A-button pulse in a dedicated controller profile.",
+      "author": "AccessRelay",
+      "version": "1.0.0",
+      "kind": "script",
+      "license": "0BSD",
+      "manifestPath": "packages/a-button-pulse/1.0.0/pack.json",
+      "manifestSha256": "90e045ca055d3f737a85a82d4812f87cf9df84061521e32ec5ef7675128bf600",
+      "tags": [
+        "accessibility",
+        "switch access",
+        "example"
+      ]
+    },
+    {
+      "id": "switch-access-kit",
+      "name": "Switch access kit",
+      "description": "A game-neutral switch-access plugin with adjustable A-button pulse duration.",
+      "author": "AccessRelay",
+      "version": "1.0.0",
+      "kind": "plugin",
+      "license": "0BSD",
+      "manifestPath": "packages/switch-access-kit/1.0.0/pack.json",
+      "manifestSha256": "fc0ca29199a8177444a93e8902b6db4b5fbe3d67cc6c70054d83617b09665b97",
+      "tags": [
+        "accessibility",
+        "switch access",
+        "example"
+      ]
+    }
+  ]
+}
