@@ -31,5 +31,8 @@ format. Game plugins can add declarative tuning/bindings and supported typed vis
 resources. This does not load arbitrary native DLLs, JavaScript UI, Python code or
 new model runtimes. Host API changes belong in the application repository.
 
-The initial packages are small AccessRelay-authored examples, clearly attributed
-as such. They are not a claim of an existing community library or gameplay model.
+The catalog includes the NBA 2K27 package. In Studio, its Open training action
+opens AI Model Training with NBA 2K27 selected; controller scripts can be installed
+separately. Training and live UI use the reviewed NBA adapter bundled with Studio.
+The package contains no trained model weights. The earlier sample packages are
+unlisted; published versioned sources remain available in repository history.

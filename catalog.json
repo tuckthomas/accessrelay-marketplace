@@ -2,35 +2,20 @@
   "schemaVersion": 1,
   "entries": [
     {
-      "id": "a-button-pulse",
-      "name": "A button pulse",
-      "description": "Turn a right-bumper press into a short A-button pulse in a dedicated controller profile.",
-      "author": "AccessRelay",
-      "version": "1.0.0",
-      "kind": "script",
-      "license": "0BSD",
-      "manifestPath": "packages/a-button-pulse/1.0.0/pack.json",
-      "manifestSha256": "90e045ca055d3f737a85a82d4812f87cf9df84061521e32ec5ef7675128bf600",
-      "tags": [
-        "accessibility",
-        "switch access",
-        "example"
-      ]
-    },
-    {
-      "id": "switch-access-kit",
-      "name": "Switch access kit",
-      "description": "A game-neutral switch-access plugin with adjustable A-button pulse duration.",
+      "id": "nba2k27",
+      "name": "NBA 2K27",
+      "description": "NBA 2K27 shot profiles, gameplay training capture and live assistance in Studio. Includes optional controller scripts. A trained model must be created from gameplay clips.",
       "author": "AccessRelay",
       "version": "1.0.0",
       "kind": "plugin",
       "license": "0BSD",
-      "manifestPath": "packages/switch-access-kit/1.0.0/pack.json",
-      "manifestSha256": "fc0ca29199a8177444a93e8902b6db4b5fbe3d67cc6c70054d83617b09665b97",
+      "manifestPath": "packages/nba2k27/1.0.0/pack.json",
+      "manifestSha256": "7515aa8c118d321fcfe167ba867b6bf7d061ce298ca90d5525774a421a94dfa4",
       "tags": [
-        "accessibility",
-        "switch access",
-        "example"
+        "nba2k27",
+        "training",
+        "vision",
+        "controller"
       ]
     }
   ]
