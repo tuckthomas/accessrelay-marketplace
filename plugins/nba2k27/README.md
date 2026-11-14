@@ -1,6 +1,6 @@
 # NBA 2K27 implementation
 
-## Direct meter assistance (1.2.0; Studio beta.31+)
+## Direct meter assistance (1.2.1; Studio beta.33+)
 
 Choose **Shot meter · direct detection** in Live Gameplay or Model Training.
 Select a meter-on shot profile and enable the **Curved** meter in the game.
@@ -18,14 +18,22 @@ backward progression and broken cadence invalidate the attempt. Rolling
 past/present-only fits report velocity, forecast and uncertainty. Noisy fits
 withhold updates; they cannot refresh the host's valid-forecast deadline.
 
-**Calibration trial** permits an explicitly armed practice attempt with unverified
-parameters. Set the installed game build, estimated video/input delays, timing
-correction, stroke duration, timing-anchor axis fraction, linear/smooth curve and
-full-up hold. Start meter analysis, connect controller output and explicitly enable
-the trial. Hold the physical input until the action finishes, then return neutral.
-Save the game's timing and tempo feedback after each completed action. Saving
-feedback disables assistance. Tune in practice rather than assuming the defaults
-are correct; a negative correction sends earlier, a positive correction later.
+The preview and practice panel sit together. Readiness shows whether gameplay is
+capturing and controller output is connected; connection errors appear beside the
+controls. Start the preview, connect output if needed, then choose **Start practice
+trial**. Hold the physical input until the reversal finishes, then return neutral.
+The page pauses a trial started there when its new native action receipt arrives.
+Opening the page never starts capture, connects output or arms assistance.
+
+After a completed action, select the timing and tempo NBA actually reported and
+choose **Save result**. Feedback starts blank. Three matching Excellent results
+enable **Save calibration**. An existing unconfirmed set from another app session
+requires a fresh completed action before confirmation.
+
+**Advanced settings** holds game build, latency estimates, timing correction,
+stroke duration, timing-anchor fraction, curve, up hold and detector tuning. Apply
+valid changes to pause assistance and resume the preview; controller output stays
+connected. A negative correction sends earlier, a positive correction later.
 For tempo, test stroke durations empirically against the game's Fast/Slow feedback;
 the game-specific recognition threshold has not been independently measured.
 
@@ -37,7 +45,8 @@ requests cadence and does not guarantee Windows or Xbox delivery at that cadence
 The ramp is committed at start, not repeatedly warped after motion begins.
 
 Normal assistance needs three native completed-action receipts with Excellent
-timing and (for rhythm) Excellent tempo, then explicit confirmation and restart.
+timing and (for rhythm) Excellent tempo, followed by explicit confirmation. The
+page refreshes the preview after confirmation and leaves assistance off until started.
 Receipts bind feedback to the actual local action and reject duplicate feedback.
 Profile, camera, meter appearance, game build, capture source, resolution and timing
 edits require matching results. Confirmation is user-reported practice evidence,

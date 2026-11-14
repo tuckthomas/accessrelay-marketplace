@@ -51,7 +51,7 @@ provenance.write_text(json.dumps(dict(plugin='plugins/nba2k27', contractVersion=
     sources={str(file.relative_to(ROOT)).replace('\\','/'): hashlib.sha256(file.read_bytes().replace(b'\r\n', b'\n')).hexdigest() for file in sources}), indent=2) + '\n', encoding='utf-8', newline='\n')
 add(provenance, 'data/source.json', 'data')
 manifest = dict(schemaVersion=2, apiVersion=2, id='nba2k27-training', version=version,
-    name='NBA 2K27 Assistance & Training', description='Direct curved-meter detection and calibrated rhythm/button assistance, plus optional animation-model training and clip review. Meter assistance runs on CPU without pose/OCR models. Requires Studio beta.31 or newer.',
+    name='NBA 2K27 Assistance & Training', description='Direct curved-meter detection with guided practice calibration, controller readiness and explicit shot feedback. Optional animation-model training and clip review. Meter detection runs on CPU without pose/OCR. Requires Studio beta.33 or newer.',
     license='0BSD; capture models Apache-2.0', gameId='nba2k27', trainingAdapter='nba2k27-training-v1', visionAdapter='temporal-release-v1',
     runtime=dict(assembly='runtime/accessrelay.nba2k27.dll', factory='EliteScriptStudio.Packs.Nba2K27.NbaPluginFactory', uiEntry='ui/index.js',
         trainingEntry='training/Run-NbaTraining.py', modelDirectory='capture-models', contractVersion=2,
