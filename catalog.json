@@ -4,14 +4,14 @@
     {
       "id": "nba2k27-training",
       "name": "NBA 2K27 Assistance & Training",
-      "description": "Direct curved-meter detection and calibrated rhythm/button assistance, plus optional animation-model training and clip review. Meter assistance runs on CPU without pose/OCR models. Requires Studio beta.31 or newer.",
+      "description": "Direct curved-meter detection with guided practice calibration, controller readiness and explicit shot feedback. Optional animation-model training and clip review. Meter detection runs on CPU without pose/OCR. Requires Studio beta.33 or newer.",
       "author": "AccessRelay",
-      "version": "1.2.1",
+      "version": "1.2.2",
       "kind": "training-plugin",
       "gameId": "nba2k27",
       "license": "0BSD; capture models Apache-2.0",
-      "manifestPath": "packages/nba2k27-training/1.2.1/pack.json",
-      "manifestSha256": "679c071bc17a9d0365e15e4039515b9d203605e861f0f5e8574127e83a569878",
+      "manifestPath": "packages/nba2k27-training/1.2.2/pack.json",
+      "manifestSha256": "25d762ad3465601eef873e077ae2e5e5743c2dfd71fa725b417ec9f90f53d854",
       "tags": [
         "nba2k27",
         "training",
