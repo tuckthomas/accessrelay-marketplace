@@ -3,15 +3,15 @@
   "entries": [
     {
       "id": "nba2k27-training",
-      "name": "NBA 2K27 Model Training",
-      "description": "NBA 2K27 profiles, automatic player/meter/court regions, clip review and offline model training. Includes pose/OCR capture models; the shot-release model requires your training footage.",
+      "name": "NBA 2K27 Assistance & Training",
+      "description": "Direct curved-meter detection and calibrated rhythm/button assistance, plus optional animation-model training and clip review. Meter assistance runs on CPU without pose/OCR models. Requires Studio beta.31 or newer.",
       "author": "AccessRelay",
-      "version": "1.1.1",
+      "version": "1.2.0",
       "kind": "training-plugin",
       "gameId": "nba2k27",
       "license": "0BSD; capture models Apache-2.0",
-      "manifestPath": "packages/nba2k27-training/1.1.1/pack.json",
-      "manifestSha256": "87bea8a9d81df46587bfc564fa2781f57fd5680dd2ef6e5dbaf08f8ff9d8d219",
+      "manifestPath": "packages/nba2k27-training/1.2.0/pack.json",
+      "manifestSha256": "3af6dcfa616e71a7ba23c4fac312996898e43be9279cd8ee80fcc5a36364cadb",
       "tags": [
         "nba2k27",
         "training",

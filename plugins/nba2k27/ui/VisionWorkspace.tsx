@@ -1,5 +1,6 @@
 import { React, useEffect, useRef, useState, ProfilePicker, GameplayPreview, Select, SelectOption, Input, Slider, Checkbox, Badge, Button, Card, DiscardDialog, EmptyState, Field, Icon, Modal, Notice, Tabs, Toggle, hasUnsavedChanges, useUnsavedChanges, type VisionWorkspaceProps } from './host.js';
 import type { PointerEvent as Pointer } from 'react';
+import { MeterAssistance, meterArguments, meterDefaults } from './MeterAssistance.js';
 
 type Box = { left: number; top: number; width: number; height: number };
 type Run = (action: string, args?: any, done?: (result: any) => void) => Promise<any>;
@@ -15,7 +16,32 @@ const categories = ['Mixed / unclassified', 'Stationary', 'Catch-and-shoot', 'Of
 const num = (value: any, digits = 1) => typeof value === 'number' && Number.isFinite(value) ? value.toFixed(digits) : '—';
 const fresh = () => ({ id: crypto.randomUUID(), name: '', heightInches: 78, threePointRating: 80, base: '', upperRelease1: '', upperRelease2: '', usesShotMeter: true, meterReleaseType: '', shotSpeed: 4, release1Percent: 50, cameraView: '2K', gamertag: '' });
 
-export function Nba2K27VisionWorkspace({ state = {}, status, command, mode, captureWindow }: VisionWorkspaceProps) {
+export function Nba2K27VisionWorkspace(props: VisionWorkspaceProps) {
+  const [method, setMethod] = useState(props.state?.settings?.pluginAssistance?.enabled === false ? 'animation' : 'meter');
+  const [editor, setEditor] = useState<any>(null), [error, setError] = useState(''), [busy, setBusy] = useState(false);
+  const [pendingMethod, setPendingMethod] = useState<string | null>(null);
+  const s = props.status ?? props.state?.status ?? {};
+  async function switchMethod(next: string) {
+    if (next === method) return;
+    setError(''); setBusy(true);
+    try { if (props.state?.selectedProfile) await props.command('signalConfigure', meterArguments({ ...meterDefaults,
+      ...props.state?.settings?.pluginAssistance, enabled: next === 'meter' }, props.state?.settings ?? {})); setMethod(next); }
+    catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); }
+  }
+  return <div className="page-stack"><style>{styles}</style>
+    <Field label="Assistance method"><Select value={method} disabled={busy || !!s.session?.running || !!s.stopping} onValueChange={next => { if (hasUnsavedChanges()) setPendingMethod(next); else void switchMethod(next); }}>
+      <SelectOption value="meter">Shot meter · direct detection</SelectOption><SelectOption value="animation">Animation model · meter off</SelectOption></Select></Field>
+    {error && <Notice tone="danger">{error}</Notice>}
+    {method === 'meter' ? <MeterAssistance {...props} editProfile={profile => setEditor(profile ? { ...profile } : fresh())} /> : <AnimationWorkspace {...props} />}
+    <DiscardDialog open={pendingMethod !== null} onKeep={() => setPendingMethod(null)} onDiscard={() => { const next = pendingMethod; setPendingMethod(null); if (next) void switchMethod(next); }} />
+    {editor && <ProfileEditor key={editor.id} profile={editor} isSaved={(props.state?.profiles ?? []).some((p: any) => p.id === editor.id)}
+      fingerprint={editor.id === props.state?.selectedProfile?.id ? props.state?.selectedFingerprint : ''} busy={busy} error={error} close={() => setEditor(null)}
+      run={async (action, args, done) => { setBusy(true); setError(''); try { const result = await props.command(action, args); done?.(result); return result; }
+        catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); } }} />}
+  </div>;
+}
+
+function AnimationWorkspace({ state = {}, status, command, mode, captureWindow }: VisionWorkspaceProps) {
   const [tab, setTab] = useState('capture'), [busy, setBusy] = useState(''), [error, setError] = useState('');
   const [editor, setEditor] = useState<any>(null), [frozen, setFrozen] = useState<any>(null), [review, setReview] = useState<any>(state?.review);
   const [settings, setSettings] = useState<any>(state?.settings ?? {}), [dirty, setDirty] = useState(false);

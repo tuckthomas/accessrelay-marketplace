@@ -45,6 +45,33 @@ internal sealed record Nba2K27ShotProfile(Guid Id, string Name, int HeightInches
     }
 
     bool ITrainingCaptureProfile.UsesSupervisionOverlay => UsesShotMeter;
+    IVisionLivePredictor? IVisionCaptureProfile.CreateLivePredictor(VisionSettings settings)
+    {
+        var meter = NbaMeterSettings.Read(settings); meter.Validate();
+        if (!meter.Enabled) return null;
+        if (!UsesShotMeter) throw new InvalidDataException("Choose a meter-on shot profile and enable the curved shot meter in NBA 2K27.");
+        return new NbaMeterPredictor(this, meter, settings);
+    }
+    void IVisionCaptureProfile.ValidateLiveAssistance(VisionSettings settings) => NbaMeterSettings.Read(settings).Validate();
+    JsonElement IVisionCaptureProfile.ConfigureLiveAssistance(VisionSettings current, JsonElement proposed)
+    {
+        var previous = NbaMeterSettings.Read(current);
+        var edited = proposed.Deserialize<NbaMeterSettings>(NbaMeterSettings.Json) ?? throw new InvalidDataException("Meter settings are empty.");
+        // UI edits cannot manufacture completed actions or confirm calibration.
+        edited = edited with { Results = previous.Results, Confirmed = previous.Confirmed,
+            CalibratedWidth = previous.CalibratedWidth, CalibratedHeight = previous.CalibratedHeight };
+        edited.Validate(); return edited.Export();
+    }
+    object IVisionCaptureProfile.DescribeLiveAssistance(VisionSettings settings)
+    {
+        var meter = NbaMeterSettings.Read(settings); meter.Validate(); string key = meter.Key(this, settings);
+        return new { key, accepted = meter.Accepted(this, settings), successfulTrials = meter.Results.Count(r => r.Key == key && r.Width == meter.CalibratedWidth && r.Height == meter.CalibratedHeight
+            && r.Timing == "excellent" && (meter.InputMode == "button" || r.Tempo == "excellent")),
+            currentResults = meter.Results.Where(r => r.Key == key).ToArray() };
+    }
+    JsonElement IVisionCaptureProfile.ApplyLiveCalibration(VisionSettings settings, JsonElement feedback,
+        VisionActionReceipt receipt, VisionSignalObservation observation)
+        => NbaMeterSettings.Read(settings).Feedback(this, settings, feedback, receipt, observation).Export();
     string IVisionCaptureProfile.AnimationProfile => "nba2k27:" + ConfigurationFingerprint;
     object IVisionCaptureProfile.ExportProfile() => this;
     bool IVisionCaptureProfile.ReferenceTriggered(ControllerState input) => Math.Abs((int)input.RightY) > 16000 || ControlMap.IsPressed(ControlId.X, input, PaddleButtons.None);

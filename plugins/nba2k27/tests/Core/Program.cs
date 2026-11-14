@@ -1,5 +1,10 @@
 using EliteScriptStudio.Core;
 
+if (args is ["--meter-calibration"]) { MeterChecks.Calibration(); return; }
+
+if (args is ["--meter-recorded", var meterDirectory, var meterOutput])
+{ MeterChecks.Inspect(meterDirectory, meterOutput); return; }
+
 if (args is ["--inspect-acquisition", var bitmap, var observation, var report])
 {
     AutomaticIdentityChecks.InspectAcquisition(bitmap, observation, report);

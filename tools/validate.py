@@ -40,7 +40,7 @@ for item in catalog['entries']:
         assert hashlib.sha256(data).hexdigest() == asset['sha256']
     if 'runtime' in manifest:
         runtime = manifest['runtime']
-        assert runtime['contractVersion'] == 1
+        assert runtime['contractVersion'] in (1, 2)
         declared = {a['path']: a['kind'] for a in manifest['assets']}
         for key, kind in [('assembly','runtime'), ('uiEntry','ui'), ('trainingEntry','workflow'), ('auditEntry','workflow'), ('experimentsEntry','workflow')]:
             assert declared[runtime[key]] == kind
