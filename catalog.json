@@ -4,19 +4,20 @@
     {
       "id": "nba2k27-training",
       "name": "NBA 2K27 Model Training",
-      "description": "NBA 2K27 shot profiles, gameplay evidence recording, clip review and model integration. No trained model weights are included.",
+      "description": "NBA 2K27 profiles, automatic player/meter/court regions, clip review and offline model training. Includes pose/OCR capture models; the shot-release model requires your training footage.",
       "author": "AccessRelay",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "kind": "training-plugin",
       "gameId": "nba2k27",
-      "license": "0BSD",
-      "manifestPath": "packages/nba2k27-training/1.0.0/pack.json",
-      "manifestSha256": "bebd2616c92562f1789a6def776da7d7141a7a3698872deb88240d32a59ec4ba",
+      "license": "0BSD; capture models Apache-2.0",
+      "manifestPath": "packages/nba2k27-training/1.1.0/pack.json",
+      "manifestSha256": "1b6e242aebb7fba948e5d085fa0692fe6316493eb96519b0a017b8817d9bc6fb",
       "tags": [
         "nba2k27",
         "training",
         "vision"
-      ]
+      ],
+      "nativeCode": true
     },
     {
       "id": "nba2k27",

@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>accessrelay.nba2k27</AssemblyName>
+    <Version>1.1.0</Version>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <HostSdkRoot Condition="'$(HostSdkRoot)' == ''">$(MSBuildProjectDirectory)/../../../AccessRelayStudio-Source</HostSdkRoot>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="src/*.cs" />
+    <ProjectReference Include="$(HostSdkRoot)/src/AccessRelayStudio.Engine/AccessRelayStudio.Engine.csproj" />
+    <InternalsVisibleTo Include="AccessRelay.PluginVerification" />
+  </ItemGroup>
+</Project>

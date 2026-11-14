@@ -1,0 +1,42 @@
+name: Game implementation contract
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  nba:
+    runs-on: windows-2025
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: AccessRelayMarketplace-Source
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: AccessRelayMarketplace-Source
+      - uses: actions/checkout@v5
+        with:
+          repository: tuckthomas/accessrelay-studio
+          path: AccessRelayStudio-Source
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24.x'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.25.0'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pnpm --dir ../AccessRelayStudio-Source/src/AccessRelayStudio/DesktopUi install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --dir plugins/nba2k27 build
+      - run: python tools/validate.py
+      - run: dotnet run --project plugins/nba2k27/tests/Core/PluginVerification.csproj -c Release
+      - run: pnpm --dir plugins/nba2k27 test
+      - run: dotnet run --project ../AccessRelayStudio-Source/src/AccessRelayStudio/Verification/Verification.csproj -c Release -- --installed-plugin packages/nba2k27-training/1.1.0/pack.json artifacts/loader
+      - run: python -S -m unittest discover -s plugins/nba2k27/tests/python -p 'test_*.py' -v
+      - run: dotnet build plugins/nba2k27/tests/Windows/PluginWindowsVerification.csproj -c Release
+      - run: dotnet run --project plugins/nba2k27/tests/Assistant/PluginAssistantVerification.csproj -c Release -- --python (Get-Command python).Source

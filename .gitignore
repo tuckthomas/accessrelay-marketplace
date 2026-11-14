@@ -1,0 +1,12 @@
+node_modules/
+bin/
+obj/
+artifacts/
+dist/
+__pycache__/
+*.pyc
+*.log
+.env
+.env.*
+*.user
+take-*/

@@ -1,0 +1,5 @@
+{
+  "name": "accessrelay-marketplace",
+  "private": true,
+  "scripts": { "validate": "python tools/validate.py", "build:nba": "pnpm --dir plugins/nba2k27 build" }
+}

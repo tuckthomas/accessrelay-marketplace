@@ -19,7 +19,8 @@ for item in catalog['entries']:
     path = root / item['manifestPath']
     assert hashlib.sha256(path.read_bytes()).hexdigest() == item['manifestSha256']
     manifest = json.loads(path.read_text(encoding='utf-8'))
-    assert manifest['schemaVersion'] == manifest['apiVersion'] == 1
+    assert manifest['schemaVersion'] == manifest['apiVersion'] and manifest['schemaVersion'] in (1, 2)
+    assert item.get('nativeCode', False) == ('runtime' in manifest)
     for key in ('id', 'version', 'name', 'license'):
         assert item[key] == manifest[key], key
     assert item.get('gameId', '') == manifest.get('gameId', '')
@@ -30,10 +31,29 @@ for item in catalog['entries']:
     for asset in manifest['assets']:
         parts = Path(asset['path']).parts
         assert not Path(asset['path']).is_absolute() and '..' not in parts and ':' not in asset['path']
-        assert asset['kind'] in ('lua', 'model', 'visionManifest')
+        assert asset['kind'] in ('lua', 'model', 'visionManifest', 'runtime', 'ui', 'workflow', 'captureModel', 'data')
+        if manifest['schemaVersion'] == 1: assert asset['kind'] in ('lua', 'model', 'visionManifest')
         resource = path.parent / asset['path']
         assert resource.resolve().is_relative_to(path.parent.resolve()) and not resource.is_symlink()
         data = resource.read_bytes()
         assert len(data) == asset['bytes']
         assert hashlib.sha256(data).hexdigest() == asset['sha256']
+    if 'runtime' in manifest:
+        runtime = manifest['runtime']
+        assert runtime['contractVersion'] == 1
+        declared = {a['path']: a['kind'] for a in manifest['assets']}
+        for key, kind in [('assembly','runtime'), ('uiEntry','ui'), ('trainingEntry','workflow'), ('auditEntry','workflow'), ('experimentsEntry','workflow')]:
+            assert declared[runtime[key]] == kind
+        assert runtime['modelDirectory'] == 'capture-models'
+        provenance = json.loads((path.parent / 'data/source.json').read_text())
+        for name, digest in provenance['sources'].items():
+            source = (root / name).resolve()
+            assert source.is_relative_to(root / 'plugins')
+            assert hashlib.sha256(source.read_bytes().replace(b'\r\n', b'\n')).hexdigest() == digest, name
+        ui_files = [path.parent / a['path'] for a in manifest['assets'] if a['kind'] == 'ui']
+        for file in ui_files:
+            text = file.read_text(encoding='utf-8')
+            assert not re.search(r"from\s+['\"]react(?:/|['\"])", text), file
+        files = {str(f.relative_to(path.parent)).replace('\\','/') for f in path.parent.rglob('*') if f.is_file()}
+        assert files == set(declared) | {'pack.json'}, 'Unlisted package resources'
 print(f"SUCCESS: {len(seen)} versioned marketplace packages and source hashes validated.")
