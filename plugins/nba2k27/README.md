@@ -1,6 +1,6 @@
 # NBA 2K27 implementation
 
-## Direct meter assistance (1.2.2; Studio beta.33+)
+## Direct meter assistance (1.2.3; Studio beta.33+)
 
 Choose **Shot meter · direct detection** in Live Gameplay or Model Training.
 Select a meter-on shot profile and enable the **Curved** meter in the game.
@@ -10,6 +10,17 @@ interior fill. The protruding Pro Stick tick is not used as an animation clock.
 Resolution changes scale pixel geometry automatically; no player, gamertag,
 pose, court polygon, model file or training dataset is required for this mode.
 Other meter styles are not claimed to work with this detector.
+
+Version 1.2.3 fixes fill continuity at higher capture resolutions. The previous
+fixed-pixel gap tolerance could split a rising fill after a small compression
+break; a real-shot fixture with a two-row dark gap reproduced 76% fill being read
+as 47% at 1440p.
+The tolerance now scales with capture height. The same fixture retains 76%,
+while larger separated bright regions remain disconnected. Geometry score also
+remains visible while the predictor is still measuring velocity. Existing
+calibration receipts remain saved, but the changed detector policy requires
+fresh matching calibration. This is offline regression evidence; live reversal
+and game timing still require practice validation.
 
 Physical input passes through immediately. A configurable hold qualifies
 acquisition; it is a heuristic, not a guarantee that a movement is a shot.

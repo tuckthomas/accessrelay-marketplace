@@ -5,6 +5,12 @@ if (args is ["--meter-calibration"]) { MeterChecks.Calibration(); return; }
 if (args is ["--meter-recorded", var meterDirectory, var meterOutput])
 { MeterChecks.Inspect(meterDirectory, meterOutput); return; }
 
+if (args is ["--meter-recorded-scale", var scaleDirectory, var scaleOutput, var scale])
+{ MeterChecks.Inspect(scaleDirectory, scaleOutput, int.Parse(scale)); return; }
+
+if (args is ["--meter-resolution", var resolutionDirectory])
+{ MeterChecks.Resolution(resolutionDirectory); return; }
+
 if (args is ["--inspect-acquisition", var bitmap, var observation, var report])
 {
     AutomaticIdentityChecks.InspectAcquisition(bitmap, observation, report);

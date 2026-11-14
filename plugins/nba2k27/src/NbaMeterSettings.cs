@@ -51,7 +51,7 @@ internal sealed record NbaMeterSettings
     }
     internal string Key(Nba2K27ShotProfile profile, VisionSettings settings)
     {
-        string value = JsonSerializer.Serialize(new { policy = "direct-curved-fill-v1", ConfigurationFingerprint = (profile with { Gamertag = "" }).ConfigurationFingerprint, profile.CameraView, InputMode, Style,
+        string value = JsonSerializer.Serialize(new { policy = "direct-curved-fill-v2", ConfigurationFingerprint = (profile with { Gamertag = "" }).ConfigurationFingerprint, profile.CameraView, InputMode, Style,
             Viewport, TargetRed, TargetGreen, TargetBlue, ColorToleranceDegrees, HoldMs, AcquisitionWindowMs, StrokeDurationMs, AnchorFraction, UpHoldMs,
             TargetProgress, SmoothStroke, GameBuild, settings.CaptureSourceKey, settings.ShootButton, settings.MinimumConfidence, settings.MaximumUncertaintyMs,
             settings.MaximumFrameAgeMs, settings.MaximumLatenessMs, settings.EstimatedVideoDelayMs, settings.EstimatedInputDelayMs, settings.CorrectionMs }, Json);

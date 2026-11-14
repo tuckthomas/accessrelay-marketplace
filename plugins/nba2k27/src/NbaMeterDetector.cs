@@ -115,6 +115,10 @@ internal sealed class NbaMeterDetector(NbaMeterSettings settings)
         int columns=right-left,rows=bottom-top,count=columns*rows;
         if(count<=0)return 0;
         if(_mask.Length<count){_mask=new bool[count];_queue=new int[count];}
+        // Match the acquisition sampling scale. A one-pixel interruption at 720p
+        // spans two native rows at 1440p; a fixed radius of two would split the
+        // rising fill there and report only the bottom half of the meter.
+        int bridgeRadius = Math.Max(2, (int)Math.Ceiling(height / 720d) + 1);
         for(int yy=0;yy<rows;yy++)for(int xx=0;xx<columns;xx++)
         {
             var sample=Pixel(p,width,height,stride,left+xx,top+yy);
@@ -132,8 +136,8 @@ internal sealed class NbaMeterDetector(NbaMeterSettings settings)
             {
                 int index=_queue[head++],xx=index%columns,yy=index/columns;
                 minY=Math.Min(minY,yy);maxY=Math.Max(maxY,yy);minX=Math.Min(minX,xx);maxX=Math.Max(maxX,xx);
-                // Compression can interrupt a one-pixel fill edge. Bridge at most one missing pixel.
-                for(int dy=-2;dy<=2;dy++)for(int dx=-2;dx<=2;dx++)
+                // Bridge only a resolution-scaled, one-720p-pixel compression gap.
+                for(int dy=-bridgeRadius;dy<=bridgeRadius;dy++)for(int dx=-bridgeRadius;dx<=bridgeRadius;dx++)
                 {int nx=xx+dx,ny=yy+dy;if(nx<0||nx>=columns||ny<0||ny>=rows)continue;int n=ny*columns+nx;if(_mask[n]){_mask[n]=false;_queue[tail++]=n;}}
             }
             // The detached horizontal tempo tick cannot satisfy the bottom-connected, vertical fill test.

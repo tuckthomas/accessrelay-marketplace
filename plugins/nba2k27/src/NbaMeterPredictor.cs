@@ -89,9 +89,9 @@ internal sealed class NbaMeterPredictor(Nba2K27ShotProfile profile, NbaMeterSett
         return Observation("Meter fill forecast ready.", meter, velocity, confidence, uncertainty, tau);
 
         VisionSignalObservation Observation(string message, NbaMeterDetector.Measurement? found = null, double velocity = 0,
-            double confidence = 0, double uncertainty = 0, double? tau = null, bool invalidate = false)
+            double? confidence = null, double uncertainty = 0, double? tau = null, bool invalidate = false)
             => new(sequence, captureTicks, found.HasValue, found?.Bounds, found?.Progress ?? 0, configuration.TargetProgress,
-                velocity, tau, confidence, double.IsFinite(uncertainty) ? uncertainty : 1000, message, _count,
+                velocity, tau, confidence ?? found?.Score ?? 0, double.IsFinite(uncertainty) ? uncertainty : 1000, message, _count,
                 Stopwatch.GetElapsedTime(began).TotalMilliseconds, width, height, invalidate);
     }
     private void ClearAttempt() { _count = 0; _forecasted = _acquired = false; _last = null; _lastCapture = 0; _detector.Reset(); }
