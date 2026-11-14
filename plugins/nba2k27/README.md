@@ -1,6 +1,6 @@
 # NBA 2K27 implementation
 
-## Direct meter assistance (1.2.1; Studio beta.33+)
+## Direct meter assistance (1.2.2; Studio beta.33+)
 
 Choose **Shot meter · direct detection** in Live Gameplay or Model Training.
 Select a meter-on shot profile and enable the **Curved** meter in the game.
