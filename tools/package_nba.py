@@ -48,7 +48,7 @@ for name, digest in expected.items():
 sources = sorted([* (PLUGIN / 'src').glob('*.cs'), * (PLUGIN / 'ui').glob('*.ts'), * (PLUGIN / 'ui').glob('*.tsx'), * (PLUGIN / 'training').glob('*.py')])
 provenance = target / 'data/source.json'
 provenance.write_text(json.dumps(dict(plugin='plugins/nba2k27', contractVersion=1,
-    sources={str(file.relative_to(ROOT)).replace('\\','/'): hashlib.sha256(file.read_bytes().replace(b'\r\n', b'\n')).hexdigest() for file in sources}), indent=2) + '\n', encoding='utf-8')
+    sources={str(file.relative_to(ROOT)).replace('\\','/'): hashlib.sha256(file.read_bytes().replace(b'\r\n', b'\n')).hexdigest() for file in sources}), indent=2) + '\n', encoding='utf-8', newline='\n')
 add(provenance, 'data/source.json', 'data')
 manifest = dict(schemaVersion=2, apiVersion=2, id='nba2k27-training', version=version,
     name='NBA 2K27 Model Training', description='NBA 2K27 profiles, automatic player/meter/court regions, clip review and offline model training. Includes pose/OCR capture models; the shot-release model requires your training footage.',
@@ -58,12 +58,12 @@ manifest = dict(schemaVersion=2, apiVersion=2, id='nba2k27-training', version=ve
         auditEntry='training/Audit-VisionDataset.py', experimentsEntry='training/Run-VisionExperiments.py'),
     assets=assets, bindings=[], tuning=[], presets=[])
 manifest_file = target / 'pack.json'
-manifest_file.write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
+manifest_file.write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8', newline='\n')
 catalog_file = ROOT / 'catalog.json'
 catalog = json.loads(catalog_file.read_text(encoding='utf-8'))
 entry = next(item for item in catalog['entries'] if item['id'] == manifest['id'])
 entry.update({key: manifest[key] for key in ('name','description','version','license','gameId')})
 entry.update(manifestPath=str(manifest_file.relative_to(ROOT)).replace('\\','/'),
     manifestSha256=hashlib.sha256(manifest_file.read_bytes()).hexdigest(), nativeCode=True)
-catalog_file.write_text(json.dumps(catalog, indent=2) + '\n', encoding='utf-8')
+catalog_file.write_text(json.dumps(catalog, indent=2) + '\n', encoding='utf-8', newline='\n')
 print(f'SUCCESS {manifest["id"]}@{version}: {len(assets)} checked implementation assets, {sum(a["bytes"] for a in assets)/1024**2:.1f} MiB.')

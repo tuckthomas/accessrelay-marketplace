@@ -11,7 +11,7 @@
       "gameId": "nba2k27",
       "license": "0BSD; capture models Apache-2.0",
       "manifestPath": "packages/nba2k27-training/1.1.0/pack.json",
-      "manifestSha256": "1b6e242aebb7fba948e5d085fa0692fe6316493eb96519b0a017b8817d9bc6fb",
+      "manifestSha256": "a0fd06f6e7d4bdb45a59701aad81e4afa8cbece2460791dbda93d2bc2b6e974b",
       "tags": [
         "nba2k27",
         "training",
