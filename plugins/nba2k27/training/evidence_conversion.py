@@ -8,6 +8,7 @@ import hashlib
 import json
 import math
 import os
+import re
 from pathlib import Path
 import shutil
 import tempfile
@@ -17,6 +18,16 @@ MAX_VISUAL_BYTES = 2 * 1024 ** 3
 PROFILE_FIELDS = ("heightInches", "threePointRating", "base", "upperRelease1", "upperRelease2", "shotSpeed", "release1Percent", "cameraView")
 FILES = {"sourceMetadataFile": "source-session.json", "sourceLabelsFile": "source-labels.json",
          "studentReferenceFile": "student-reference.json", "reviewFile": "conversion-review.json"}
+
+
+def canonical_game_build(value):
+    """An Xbox File-info version may have its platform appended by older capture UI.
+
+    Preserve unknown build strings exactly; never infer an unknown/latest version.
+    """
+    if isinstance(value, str) and re.fullmatch(r"\d+\.\d+\.\d+\.\d+(?: \(Xbox Series X\|S\))?", value):
+        return value.split(" ", 1)[0]
+    return value
 
 
 def digest(path):
@@ -276,7 +287,7 @@ def validate_mapping(source, student):
             first, second = unicodedata.normalize("NFC", first.strip()), unicodedata.normalize("NFC", second.strip())
         if first != second: raise ValueError("Teacher/student animation or camera mismatch: " + field)
     if source["captureEvidence"]["version"] in (3, 4):
-        if student["captureEvidence"]["version"] != source["captureEvidence"]["version"] or source["captureEvidence"]["layout"]["gameBuild"] != student["captureEvidence"]["layout"]["gameBuild"]:
+        if student["captureEvidence"]["version"] != source["captureEvidence"]["version"] or canonical_game_build(source["captureEvidence"]["layout"]["gameBuild"]) != canonical_game_build(student["captureEvidence"]["layout"]["gameBuild"]):
             raise ValueError("Anchored teacher/student policy or game build differs")
         if source["captureEvidence"]["version"] == 4 and source["shotProfile"].get("gamertag") != student["shotProfile"].get("gamertag"):
             raise ValueError("Automatic teacher/student player identity differs")
@@ -301,13 +312,25 @@ def validate_review(review, source, hashes, data_hashes):
 
 
 def converted_metadata(source, student, conversion):
-    return source | {"shotProfile": student["shotProfile"], "shotProfileFingerprint": student["shotProfileFingerprint"],
-                     "animationProfile": "nba2k27:" + student["shotProfileFingerprint"], "trainingConversion": conversion}
+    result = source | {"shotProfile": student["shotProfile"], "shotProfileFingerprint": student["shotProfileFingerprint"],
+                       "animationProfile": "nba2k27:" + student["shotProfileFingerprint"], "trainingConversion": conversion}
+    if conversion["version"] == 2:
+        result["frames"] = [source["frames"][index] for index in conversion["modelInputFrameIndices"]]
+        evidence = source["captureEvidence"]
+        result["captureEvidence"] = evidence | {"layout": evidence["layout"] | {"gameBuild": canonical_game_build(evidence["layout"]["gameBuild"])}}
+    return result
+
+
+def reviewed_input_indices(source, labels):
+    # Review is scoped to these actual model pixels. Unlabelled source pixels stay
+    # intact for audit but cannot become temporal history or training examples.
+    return [index for index, frame in enumerate(source["frames"])
+            if any(shot["startTicks"] <= frame["captureTicks"] <= shot["endTicks"] for shot in labels["shots"])]
 
 
 def verify_conversion(directory, session):
     conversion = session.get("trainingConversion")
-    if not isinstance(conversion, dict) or conversion.get("version") != 1 or conversion.get("pixelPolicy") not in ("player-roi-disjoint-overlay-v1", "tracked-player-roi-disjoint-overlay-v1") or conversion.get("validationPassed") is not False:
+    if not isinstance(conversion, dict) or conversion.get("version") not in (1, 2) or conversion.get("pixelPolicy") not in ("player-roi-disjoint-overlay-v1", "tracked-player-roi-disjoint-overlay-v1") or conversion.get("validationPassed") is not False:
         raise ValueError("Unsupported reviewed training conversion")
     if any(conversion.get(key) != filename for key, filename in FILES.items()): raise ValueError("Conversion proof filenames are invalid")
     paths = {key: child(directory, filename) for key, filename in FILES.items()}
@@ -316,6 +339,11 @@ def verify_conversion(directory, session):
     expected_policy = "tracked-player-roi-disjoint-overlay-v1" if source["captureEvidence"]["version"] in (3, 4) else "player-roi-disjoint-overlay-v1"
     if conversion["pixelPolicy"] != expected_policy: raise ValueError("Converted pixel policy differs from acquisition")
     validate_mapping(source, student); validate_labels(labels, source)
+    if conversion["version"] == 2:
+        indices = reviewed_input_indices(source, labels)
+        if (review.get("inputFramePolicy") != "reviewed-intervals-v1" or not indices
+                or conversion.get("modelInputFrameIndices") != indices):
+            raise ValueError("Converted model inputs differ from the explicitly reviewed intervals")
     hashes = {"sourceSessionSha256": digest(paths["sourceMetadataFile"]), "labelsSha256": digest(paths["sourceLabelsFile"]), "studentReferenceSha256": digest(paths["studentReferenceFile"])}
     data_hashes = conversion.get("sourceDataSha256")
     if not isinstance(data_hashes, dict) or set(data_hashes) != set(expected_files): raise ValueError("Missing source data integrity map")
@@ -354,9 +382,12 @@ def convert(source_directory, student_directory, review_file, destination, prefe
             else: shutil.copyfile(original, staging / filename)
         for original, filename in [(source_path, FILES["sourceMetadataFile"]), (labels_path, FILES["sourceLabelsFile"]), (student_path, FILES["studentReferenceFile"]), (Path(review_file), FILES["reviewFile"]), (labels_path, "labels.json")]:
             shutil.copyfile(original, staging / filename)
-        conversion = {"version": 1, "sourceSessionId": source["sessionId"], "studentReferenceSessionId": student["sessionId"],
+        scoped = review.get("inputFramePolicy") == "reviewed-intervals-v1"
+        conversion = {"version": 2 if scoped else 1, "sourceSessionId": source["sessionId"], "studentReferenceSessionId": student["sessionId"],
                       "pixelPolicy": "tracked-player-roi-disjoint-overlay-v1" if source["captureEvidence"]["version"] in (3, 4) else "player-roi-disjoint-overlay-v1", "validationPassed": False, **FILES, **hashes,
                       "reviewSha256": digest(review_file), "sourceDataSha256": data_hashes}
+        if scoped:
+            conversion["modelInputFrameIndices"] = reviewed_input_indices(source, labels)
         metadata = converted_metadata(source, student, conversion)
         (staging / "session.json").write_text(json.dumps(metadata, indent=2, allow_nan=False) + "\n", encoding="utf-8")
         verify_conversion(staging, metadata)

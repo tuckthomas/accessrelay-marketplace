@@ -8,9 +8,11 @@ def uncertainty_semantics(mode):
     return "gaussian-95-half-width-v1" if mode == "gaussian-nll" else "absolute-error-estimate-v1"
 
 
-def build_model(history, head="global-pool", uncertainty="residual"):
+def build_model(history, head="global-pool", uncertainty="residual", minimum_uncertainty_ms=0):
     if not 2 <= history <= 16 or head not in HEADS or uncertainty not in UNCERTAINTIES:
         raise ValueError("Unsupported temporal experiment configuration")
+    if not isinstance(minimum_uncertainty_ms, (int, float)) or not 0 <= minimum_uncertainty_ms <= 500:
+        raise ValueError("Unsupported annotation uncertainty floor")
     import torch
     from torch import nn
 
@@ -27,15 +29,18 @@ def build_model(history, head="global-pool", uncertainty="residual"):
             features = self.features(frames.permute(0, 2, 1, 3, 4))
             features = features.mean(dim=(3, 4)).flatten(1) if head == "ordered-head" else features.mean(dim=(2, 3, 4))
             output = self.head(features).sigmoid()
-            width = 1.96 + output[:, 3:4] * (2000 - 1.96) if uncertainty == "gaussian-nll" else output[:, 3:4] * 2000
+            floor = max(1.96 if uncertainty == "gaussian-nll" else 0, minimum_uncertainty_ms)
+            width = floor + output[:, 3:4] * (2000 - floor)
             return torch.cat((output[:, :2], output[:, 2:3] * 2000, width, output[:, 4:5]), dim=1)
 
     return TemporalReleaseModel()
 
 
-def experiment_loss(output, target, mode="residual", epoch=0, warmup_epochs=5):
+def experiment_loss(output, target, mode="residual", epoch=0, warmup_epochs=5, timing_scale_ms=1000):
     if mode not in UNCERTAINTIES or epoch < 0 or warmup_epochs < 0:
         raise ValueError("Unsupported uncertainty loss configuration")
+    if not isinstance(timing_scale_ms, (int, float)) or not 1 <= timing_scale_ms <= 2000:
+        raise ValueError("Unsupported timing loss scale")
     import torch
     from torch.nn import functional as functional
     positive = target[:, 1]
@@ -47,7 +52,7 @@ def experiment_loss(output, target, mode="residual", epoch=0, warmup_epochs=5):
         residual = (output[:, 2] - target[:, 2]) / 1000
         timing_uncertainty = .5 * (residual / sigma).square() + torch.log(sigma)
     else:
-        timing = functional.smooth_l1_loss(output[:, 2] / 1000, target[:, 2] / 1000, reduction="none")
+        timing = functional.smooth_l1_loss(output[:, 2] / timing_scale_ms, target[:, 2] / timing_scale_ms, reduction="none")
         residual = (output[:, 2].detach() - target[:, 2]).abs()
         uncertainty = functional.smooth_l1_loss(output[:, 3] / 1000, residual / 1000, reduction="none")
         if mode == "staged-residual" and epoch < warmup_epochs: uncertainty = uncertainty * 0

@@ -22,7 +22,7 @@ import sys
 
 from vision_preprocessing import PREPROCESSING_ID, resize_stored_bgra
 from footage_integrity import footage_index, validate_independent
-from evidence_conversion import verify_conversion
+from evidence_conversion import verify_conversion, canonical_game_build
 from temporal_experiments import HEADS, UNCERTAINTIES, build_model, experiment_loss, uncertainty_semantics
 from dataset_provenance import source_files, corpus_sha
 
@@ -191,6 +191,8 @@ def load_sessions(directories: list[Path], split: str, history: int, interval_ms
                 if len(selected) != history:
                     continue
                 selected.reverse()
+                if frames[selected[0]]["captureTicks"] < start:
+                    continue
                 intervals = [(frames[b]["captureTicks"] - frames[a]["captureTicks"]) * 1000 / frequency for a, b in zip(selected, selected[1:])]
                 if any(gap < .85 * interval_ms or gap > 2.5 * interval_ms for gap in intervals):
                     continue
@@ -228,6 +230,8 @@ def main() -> int:
     parser.add_argument("--uncertainty", choices=UNCERTAINTIES, default="residual")
     parser.add_argument("--uncertainty-warmup-epochs", type=int, default=5)
     parser.add_argument("--cpu-threads", type=int, default=1)
+    parser.add_argument("--timing-scale-ms", type=float, default=1000)
+    parser.add_argument("--minimum-uncertainty-ms", type=float, default=0)
     args = parser.parse_args()
     if any((args.out / name).exists() for name in ("animation-model.onnx", "manifest.json", "training-run.json")):
         raise ValueError("Choose a fresh output directory; existing model/provenance files are never overwritten")
@@ -237,6 +241,8 @@ def main() -> int:
         raise ValueError("Epoch/batch limits exceeded")
     if not 1 <= args.cpu_threads <= 64 or not 0 <= args.uncertainty_warmup_epochs <= 1000:
         raise ValueError("CPU-thread/warm-up limits exceeded")
+    if not 1 <= args.timing_scale_ms <= 2000 or not 0 <= args.minimum_uncertainty_ms <= 500:
+        raise ValueError("Timing loss scale or annotation uncertainty floor is invalid")
     os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
     import numpy as np
     import torch
@@ -250,7 +256,8 @@ def main() -> int:
     if args.device == "cuda" and not torch.cuda.is_available():
         raise ValueError("This offline PyTorch installation has no available CUDA device; choose cpu or install a matching offline training environment")
 
-    model = build_model(args.history, args.head, args.uncertainty).to(args.device)
+    model = build_model(args.history, args.head, args.uncertainty, args.minimum_uncertainty_ms).to(args.device)
+    timing_prior_ms = None
     training_log = []
     dataset_fingerprint = None
     training_session_ids, validation_session_ids = [], []
@@ -279,7 +286,7 @@ def main() -> int:
         dataset_fingerprint = train[3]
         training_session_ids, validation_session_ids = sorted(train[2]), sorted(validation[2])
         training_sources, validation_sources = source_files(train), source_files(validation)
-        builds = [session.get("captureEvidence", {}).get("layout", {}).get("gameBuild") for _, session in train[0] + validation[0]]
+        builds = [canonical_game_build(session.get("captureEvidence", {}).get("layout", {}).get("gameBuild")) for _, session in train[0] + validation[0]]
         if any(builds):
             if any(not isinstance(build, str) or not build for build in builds) or len(set(builds)) != 1:
                 raise ValueError("Training/validation require one explicit recorded game build; do not mix unknown legacy build provenance")
@@ -292,6 +299,7 @@ def main() -> int:
         class Windows(torch.utils.data.Dataset):
             def __init__(self, loaded):
                 self.sessions, self.samples = loaded[:2]
+                self.cache, self.cache_bytes = {}, 0
 
             def __len__(self):
                 return len(self.samples)
@@ -301,17 +309,31 @@ def main() -> int:
                 directory, session = self.sessions[session_index]
                 tensors = []
                 for frame_index in indices:
+                    key = (session_index, frame_index)
+                    if key in self.cache:
+                        tensors.append(self.cache[key]); continue
                     frame = session["frames"][frame_index]
                     with child_file(directory, frame["file"]).open("rb") as source:
                         source.seek(frame["offsetBytes"])
                         raw = source.read(frame["byteLength"])
                     bgra = np.frombuffer(raw, dtype=np.uint8).reshape(session["storedHeight"], session["storedWidth"], 4)
                     # Stored recorder frames are already player-cropped. Never crop them a second time.
-                    tensors.append(torch.from_numpy(resize_stored_bgra(bgra, args.height, args.width)))
+                    value = torch.from_numpy(resize_stored_bgra(bgra, args.height, args.width))
+                    if self.cache_bytes + value.nbytes <= 128 * 1024 ** 2:
+                        self.cache[key] = value; self.cache_bytes += value.nbytes
+                    tensors.append(value)
                 return torch.stack(tensors), torch.tensor(target, dtype=torch.float32)
 
         loader = torch.utils.data.DataLoader(Windows(train), batch_size=args.batch_size, shuffle=True, num_workers=0)
         validation_loader = torch.utils.data.DataLoader(Windows(validation), batch_size=args.batch_size, shuffle=False, num_workers=0)
+        # An uninformative half-horizon (1000 ms) initialization can saturate the
+        # sigmoid near zero on short cue intervals. Use only training labels for
+        # the initial bias; validation must never determine model initialization.
+        positive_horizons = [sample[2][2] for sample in train[1] if sample[2][1] > .5]
+        if positive_horizons:
+            timing_prior_ms = float(np.mean(positive_horizons))
+            probability = min(.999, max(.001, timing_prior_ms / 2000))
+            with torch.no_grad(): model.head.bias[2] = math.log(probability / (1-probability))
         optimizer = torch.optim.AdamW(model.parameters(), lr=.001)
         for epoch in range(args.epochs):
             model.train()
@@ -319,7 +341,7 @@ def main() -> int:
             for frames, target in loader:
                 frames, target = frames.to(args.device), target.to(args.device)
                 output = model(frames)
-                loss = experiment_loss(output, target, args.uncertainty, epoch, args.uncertainty_warmup_epochs)
+                loss = experiment_loss(output, target, args.uncertainty, epoch, args.uncertainty_warmup_epochs, args.timing_scale_ms)
                 optimizer.zero_grad(set_to_none=True)
                 loss.backward()
                 optimizer.step()
@@ -366,6 +388,8 @@ def main() -> int:
         "diagnosticFixture": args.diagnostic_fixture, "validationPassed": False, "datasetFingerprint": dataset_fingerprint,
         "architecture": args.head, "uncertaintyLoss": args.uncertainty, "uncertaintySemantics": uncertainty_semantics(args.uncertainty),
         "uncertaintyWarmupEpochs": args.uncertainty_warmup_epochs, "cpuThreads": args.cpu_threads,
+        "timingLossScaleMs": args.timing_scale_ms, "minimumAnnotationUncertaintyMs": args.minimum_uncertainty_ms,
+        "trainingOnlyTimingPriorMs": timing_prior_ms,
         "deterministicAlgorithms": True, "torchVersion": torch.__version__, "numpyVersion": np.__version__,
         "parameterCount": sum(parameter.numel() for parameter in model.parameters()),
         "trainingSessionIds": training_session_ids, "validationSessionIds": validation_session_ids,

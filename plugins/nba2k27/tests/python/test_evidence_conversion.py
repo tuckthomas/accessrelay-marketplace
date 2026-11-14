@@ -9,7 +9,7 @@ import unittest
 
 TRAINING = Path(__file__).resolve().parents[2] / "training"
 sys.path.insert(0, str(TRAINING))
-from evidence_conversion import convert, digest, read_json, verify_conversion, write_review_template
+from evidence_conversion import convert, digest, read_json, verify_conversion, write_review_template, canonical_game_build
 from footage_integrity import footage_index, validate_independent
 spec = importlib.util.spec_from_file_location("conversion_training", TRAINING / "Train-VisionModel.py")
 training = importlib.util.module_from_spec(spec); spec.loader.exec_module(training)
@@ -89,6 +89,31 @@ class EvidenceConversionTests(unittest.TestCase):
         loaded = training.load_sessions([converted], "validation", 4, 10)
         self.assertFalse(session["shotProfile"]["usesShotMeter"])
         validate_independent(footage_index([(self.out, train_session)]), footage_index(loaded[0]))
+
+    def test_reviewed_interval_conversion_preserves_source_and_excludes_unlabelled_inputs(self):
+        source = read_json(self.teacher / 'session.json')
+        labels = read_json(self.teacher / 'labels.json')
+        labels['shots'][1]['startTicks'] = 160000
+        self.write(self.teacher / 'labels.json', labels)
+        self.review.unlink()
+        self.approve(self.teacher, self.student, self.review)
+        review = read_json(self.review) | {'inputFramePolicy': 'reviewed-intervals-v1'}
+        self.write(self.review, review)
+        result = convert(self.teacher, self.student, self.review, self.out)
+        self.assertEqual(result['trainingConversion']['version'], 2)
+        self.assertNotIn(150000, [f['captureTicks'] for f in result['frames']])
+        self.assertEqual(read_json(self.out / 'source-session.json'), source)
+        self.assertEqual(digest(self.teacher / 'frames.bgra'), digest(self.out / 'frames.bgra'))
+        altered = copy.deepcopy(result)
+        altered['trainingConversion']['modelInputFrameIndices'].append(5)
+        with self.assertRaisesRegex(ValueError, 'reviewed intervals'):
+            verify_conversion(self.out, altered)
+
+    def test_xbox_file_info_build_suffix_is_not_a_different_patch(self):
+        self.assertEqual(canonical_game_build('2.0.0.12 (Xbox Series X|S)'), '2.0.0.12')
+        self.assertEqual(canonical_game_build('2.0.0.13'), '2.0.0.13')
+        self.assertNotEqual(canonical_game_build('2.0.0.12 (PS5)'), '2.0.0.12')
+        self.assertEqual(canonical_game_build('latest'), 'latest')
 
     def test_unapproved_template_never_converts(self):
         template = self.root / "unapproved.json"; write_review_template(self.teacher, self.student, template)

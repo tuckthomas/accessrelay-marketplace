@@ -6,6 +6,7 @@ No runtime capture/controller process is spawned. Candidates remain observation-
 import argparse
 import datetime
 import json
+import math
 from pathlib import Path
 import subprocess
 import sys
@@ -60,6 +61,17 @@ def run(request_path):
     epochs, device = options.get("epochs", 20), options.get("device", "cpu")
     if type(epochs) is not int or not 1 <= epochs <= 200 or device not in ("cpu", "cuda"):
         raise ValueError("Choose CPU/CUDA and 1–200 epochs")
+    history, interval = options.get("historyLength", 16), options.get("historyIntervalMs", 50)
+    if (type(history) is not int or not 2 <= history <= 16 or type(interval) not in (int, float)
+            or not math.isfinite(interval) or not 4 <= interval <= 100):
+        raise ValueError("Choose 2–16 history frames with a 4–100 ms interval")
+    reviewer = options.get("reviewer", "Studio interval review")
+    if not isinstance(reviewer, str) or not reviewer.strip() or len(reviewer) > 80:
+        raise ValueError("Choose a reviewer identifier of at most 80 characters")
+    timing_scale, uncertainty_floor = options.get("timingLossScaleMs", 1000), options.get("minimumAnnotationUncertaintyMs", 0)
+    if (type(timing_scale) not in (int, float) or not 1 <= timing_scale <= 2000
+            or type(uncertainty_floor) not in (int, float) or not 0 <= uncertainty_floor <= 500):
+        raise ValueError("Timing loss scale or annotation uncertainty floor is invalid")
     profile = options.get("profile")
     if not isinstance(profile, dict): raise ValueError("Select an NBA shot profile before training")
     groups = collect(source, profile)
@@ -71,8 +83,9 @@ def run(request_path):
             review = write_review_template(directory, reference, review_file)
             # These confirmations derive from explicit persisted Studio interval review,
             # validated camera/animation equivalence and per-frame geometric exclusions.
-            review.update(reviewed=True, reviewer="Studio interval review", reviewedAtUtc=datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                playerRoiContainsNoMeterOrFeedback=True, targetPhaseReviewedIndependentlyOfControllerEvents=True, teacherStudentAnimationEquivalent=True)
+            review.update(reviewed=True, reviewer=reviewer, reviewedAtUtc=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                playerRoiContainsNoMeterOrFeedback=True, targetPhaseReviewedIndependentlyOfControllerEvents=True, teacherStudentAnimationEquivalent=True,
+                inputFramePolicy="reviewed-intervals-v1")
             review_file.write_text(json.dumps(review, indent=2) + "\n", encoding="utf-8")
             destination = output / "prepared" / split / f"clip-{index:03d}"
             convert(directory, reference, review_file, destination, prefer_hard_links=True)
@@ -81,7 +94,8 @@ def run(request_path):
     tools = Path(__file__).resolve().parent
     candidate = output / "candidate"
     argv = [sys.executable, str(tools / "Train-VisionModel.py"), "--train", *map(str, prepared["train"]),
-        "--validation", *map(str, prepared["validation"]), "--out", str(candidate), "--epochs", str(epochs), "--device", device, "--cpu-threads", "1", "--head", "ordered-head", "--history", "16", "--interval-ms", "50"]
+        "--validation", *map(str, prepared["validation"]), "--out", str(candidate), "--epochs", str(epochs), "--device", device, "--cpu-threads", "1", "--head", "ordered-head", "--history", str(history), "--interval-ms", str(interval),
+        "--timing-scale-ms", str(timing_scale), "--minimum-uncertainty-ms", str(uncertainty_floor)]
     subprocess.run(argv, check=True)
     manifest = read_json(candidate / "manifest.json")
     thresholds = {"schemaVersion": 1, "datasetId": "nba-" + output.name, "animationProfile": manifest["animationProfile"],

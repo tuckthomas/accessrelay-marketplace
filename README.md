@@ -8,11 +8,17 @@ Open Marketplace in Studio to filter by type/game and install a package. Control
 packages appear in Controller → Plugins. Training plugins become selectable in
 Model Training. Installation starts no recording, inference or output.
 
-NBA 2K27 Model Training **1.1.0** is an actual implementation: C# runtime, React
+NBA 2K27 Model Training **1.1.1** is an actual implementation: C# runtime, React
 interface using Studio's shared components, player/meter/court/HUD rules, profiles,
 offline Python workflows and licensed pose/OCR capture models. Source and checks
 are in [plugins/nba2k27](plugins/nba2k27). No trained shot-release model is included.
 Existing NBA profiles and recordings remain compatible. The Rhythm Script is optional.
+
+Version 1.1.1 binds converted model inputs to reviewed intervals and keeps every
+history frame inside its interval. Original footage stays intact. Training can
+declare its temporal history, timing-loss scale and annotation uncertainty floor;
+initial timing bias uses training labels only. See
+[the first real-footage candidate report](docs/nba2k27-first-candidate.md).
 
 Schema/API 1 uses sandboxed Lua/declarative tuning. Schema/API 2 loads .NET, UI and
 workflow code with the user's permissions; it is trusted code, not a sandbox.

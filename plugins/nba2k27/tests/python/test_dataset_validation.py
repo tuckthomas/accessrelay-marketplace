@@ -52,6 +52,12 @@ class DatasetValidationTests(unittest.TestCase):
         self.assertEqual(fingerprint, "a" * 64)
         self.assertEqual(camera, "2K")
 
+    def test_temporal_history_cannot_enter_an_unreviewed_or_different_interval(self):
+        loaded = self.load([self.negative, self.target])
+        for _, indices, target in loaded[1]:
+            interval = self.target if target[1] else self.negative
+            self.assertTrue(all(interval['startTicks'] <= self.session['frames'][i]['captureTicks'] <= interval['endTicks'] for i in indices))
+
     def test_enriched_evidence_rejected_for_every_dataset_split(self):
         for purpose in ("meterSupervisedTraining", "meterOffValidation"):
             for split in ("train", "validation", "held-out"):
