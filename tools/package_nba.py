@@ -8,6 +8,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--sdk', type=Path, default=Path(os.environ.get('ACCESSRELAY_SDK_ROOT', ROOT.parent / 'AccessRelayStudio-Source')))
 parser.add_argument('--model-cache', type=Path)
 parser.add_argument('--skip-build', action='store_true')
+parser.add_argument('--runtime', type=Path, help='Use a runtime from an isolated build when --skip-build is selected.')
 args = parser.parse_args()
 sdk = args.sdk.resolve()
 version = json.loads((PLUGIN / 'package.json').read_text())['version']
@@ -30,7 +31,9 @@ def add(source, relative, kind):
     if not destination.exists() or destination.read_bytes() != data: destination.write_bytes(data)
     assets.append(dict(path=relative, kind=kind, bytes=len(data), sha256=hashlib.sha256(data).hexdigest()))
 
-add(PLUGIN / 'bin/Release/net10.0/accessrelay.nba2k27.dll', 'runtime/accessrelay.nba2k27.dll', 'runtime')
+if args.runtime and not args.skip_build:
+    raise SystemExit('--runtime requires --skip-build.')
+add(args.runtime or PLUGIN / 'bin/Release/net10.0/accessrelay.nba2k27.dll', 'runtime/accessrelay.nba2k27.dll', 'runtime')
 for file in sorted((PLUGIN / 'dist/ui').glob('*.js')): add(file, 'ui/' + file.name, 'ui')
 for file in sorted((PLUGIN / 'training').glob('*.py')): add(file, 'training/' + file.name, 'workflow')
 for file in sorted((PLUGIN / 'notices').glob('*')): add(file, 'data/' + file.name, 'data')
@@ -47,14 +50,14 @@ for name, digest in expected.items():
     add(source, 'capture-models/' + name, 'captureModel')
 sources = sorted([* (PLUGIN / 'src').glob('*.cs'), * (PLUGIN / 'ui').glob('*.ts'), * (PLUGIN / 'ui').glob('*.tsx'), * (PLUGIN / 'training').glob('*.py')])
 provenance = target / 'data/source.json'
-provenance.write_text(json.dumps(dict(plugin='plugins/nba2k27', contractVersion=2,
+provenance.write_text(json.dumps(dict(plugin='plugins/nba2k27', contractVersion=3,
     sources={str(file.relative_to(ROOT)).replace('\\','/'): hashlib.sha256(file.read_bytes().replace(b'\r\n', b'\n')).hexdigest() for file in sources}), indent=2) + '\n', encoding='utf-8', newline='\n')
 add(provenance, 'data/source.json', 'data')
 manifest = dict(schemaVersion=2, apiVersion=2, id='nba2k27-training', version=version,
-    name='NBA 2K27 Assistance & Training', description='Direct curved-meter detection with guided practice calibration, controller readiness and explicit shot feedback. Optional animation-model training and clip review. Meter detection runs on CPU without pose/OCR. Requires Studio beta.33 or newer.',
+    name='NBA 2K27 Assistance & Training', description='Curved-meter assistance with RHYTHM/TIMING feedback, calibration without a separate tempo grade, bounded timing adjustments and recorded assisted trials. Requires Studio beta.38 or newer.',
     license='0BSD; capture models Apache-2.0', gameId='nba2k27', trainingAdapter='nba2k27-training-v1', visionAdapter='temporal-release-v1',
     runtime=dict(assembly='runtime/accessrelay.nba2k27.dll', factory='EliteScriptStudio.Packs.Nba2K27.NbaPluginFactory', uiEntry='ui/index.js',
-        trainingEntry='training/Run-NbaTraining.py', modelDirectory='capture-models', contractVersion=2,
+        trainingEntry='training/Run-NbaTraining.py', modelDirectory='capture-models', contractVersion=3,
         auditEntry='training/Audit-VisionDataset.py', experimentsEntry='training/Run-VisionExperiments.py'),
     assets=assets, bindings=[], tuning=[], presets=[])
 manifest_file = target / 'pack.json'

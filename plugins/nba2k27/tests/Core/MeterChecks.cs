@@ -79,11 +79,13 @@ internal static class MeterChecks
             arbiter.Sample(physicalHold, physicalHold, true, true, false, ticks);
             var outputBefore = arbiter.Status;
             var forecast = scheduled.Observe(pixels, w, h, stride, index, 1, ticks,
-                new(physicalHold, ticks, outputBefore.SessionGeneration, outputBefore.ShotToken, outputBefore.ShotStartedTimestamp, true));
+                new(physicalHold, ticks, outputBefore.SessionGeneration, outputBefore.ShotToken, outputBefore.ShotStartedTimestamp, true)
+                { HoldStartedTimestamp = arbiter.HoldStartedTimestamp, StrokeAnchorTimestamp = arbiter.StrokeAnchorTimestamp });
             bool submitted = false;
-            if (forecast.TimeToTargetMs.HasValue || forecast.InvalidateAttempt)
+            if (forecast.TimeToTargetMs.HasValue || forecast.InvalidateAttempt || forecast.ContinueCommittedAction)
                 submitted = arbiter.Submit(new(outputBefore.SessionGeneration, outputBefore.ShotToken, index, ticks, ticks,
-                    forecast.TimeToTargetMs ?? 0, forecast.Confidence, forecast.UncertaintyMs, forecast.Acquired && !forecast.InvalidateAttempt), ticks);
+                    forecast.TimeToTargetMs ?? 0, forecast.Confidence, forecast.UncertaintyMs, forecast.Acquired && !forecast.InvalidateAttempt)
+                    { ContinueCommittedAction = forecast.ContinueCommittedAction && !forecast.InvalidateAttempt }, ticks);
             rows.Add(new { index, found, ms, signal, simulatedContinuedHold = hypothetical,
                 simulatedScheduledHold = new { forecast, submitted, status = arbiter.Status, rightY = arbiter.Output.RightY, receipt = arbiter.LastAction } }); index++;
         }
@@ -103,7 +105,8 @@ internal static class MeterChecks
             var found=new NbaMeterDetector(new()).Detect(frame,w,h,stride);
             if(found is null || found.Value.Progress<.35)throw new Exception($"An edge-translated/mirrored real meter was lost (mirror={mirror}, patch={pw}x{ph}, found={found}).");
             Blit(frame,mirror?0:w-pw,y0,mirror);
-            if(new NbaMeterDetector(new()).Detect(frame,w,h,stride) is not null)throw new Exception("Two identical meters did not reject ambiguous acquisition.");
+            var duplicate = new NbaMeterDetector(new());
+            if(duplicate.Detect(frame,w,h,stride) is not null || !duplicate.Ambiguous)throw new Exception("Two identical meters did not explicitly reject ambiguous acquisition.");
         }
         Console.WriteLine("SUCCESS Real-frame augmentations: left/right viewport edges, mirrored curve and ambiguous duplicate meter.");
         void Blit(byte[] frame,int x0,int y0,bool mirror)
@@ -159,6 +162,13 @@ internal static class MeterChecks
         var feedback = JsonSerializer.SerializeToElement(new { timing = "excellent", tempo = "excellent" });
         VisionActionReceipt Receipt(long id) => new(id, 1, id, 100, 150, 190, 80, .5, config.Key(p,settings), run);
         for(int i=1;i<=3;i++) config = config.Feedback(p, settings, feedback, Receipt(i), observation);
+        if (config.Results.Any(r => r.CorrectionMs != settings.CorrectionMs || r.StrokeDurationMs != config.StrokeDurationMs
+                || r.TuningContextKey != config.TuningContextKey(p, settings)))
+            throw new Exception("Calibration feedback did not retain its actual timing settings for subsequent tuning.");
+        if (config.TuningContextKey(p, settings) != (config with { StrokeDurationMs = 56 }).TuningContextKey(p, settings with { CorrectionMs = -8 }))
+            throw new Exception("Tuning history could not span correction/stroke changes.");
+        if (config.TuningContextKey(p, settings) == config.TuningContextKey(p, settings with { EstimatedVideoDelayMs = 1 }))
+            throw new Exception("Tuning history combined different latency settings.");
         if(config.Accepted(p,settings)) throw new Exception("Unconfirmed results enabled assistance.");
         Reject(() => config.Feedback(p, settings, feedback, Receipt(3), observation), "Duplicate feedback was accepted.");
         config = config.Feedback(p,settings,JsonSerializer.SerializeToElement(new { confirmOnly = true }),Receipt(3),observation);
@@ -166,8 +176,27 @@ internal static class MeterChecks
         if(config.Accepted(p,settings with { EstimatedVideoDelayMs = 1 })) throw new Exception("Timing edits retained calibration.");
         if((config with { CalibratedWidth = 2560 }).Accepted(p,settings)) throw new Exception("Results from different resolutions were combined.");
         if(config.Accepted(p with { ShotSpeed = 2 },settings)) throw new Exception("Changed shot profile retained calibration.");
+        var rhythmOnly = config with { Results = [], Confirmed = false, CalibrationTrial = true };
+        var rhythmFeedback = JsonSerializer.SerializeToElement(new { timing = "excellent", tempo = "none", shotType = "rhythm" });
+        for (int i = 101; i <= 103; i++) rhythmOnly = rhythmOnly.Feedback(p, settings, rhythmFeedback, Receipt(i), observation);
+        if (rhythmOnly.Results.Any(r => r.ShotType != "rhythm" || r.Tempo != "none") || rhythmOnly.Accepted(p, settings))
+            throw new Exception("Combined Rhythm feedback was changed into a fabricated tempo or confirmed automatically.");
+        rhythmOnly = rhythmOnly.Feedback(p, settings, JsonSerializer.SerializeToElement(new { confirmOnly = true }), Receipt(103), observation);
+        if (!rhythmOnly.Accepted(p, settings)) throw new Exception("Three explicitly confirmed RHYTHM Excellent results without separate tempo could not calibrate.");
+        var described = JsonSerializer.SerializeToElement(((IVisionCaptureProfile)p).DescribeLiveAssistance(settings with { PluginAssistance = rhythmOnly.Export() }));
+        if (described.GetProperty("successfulTrials").GetInt32() != 3) throw new Exception("The practice counter disagreed with combined Rhythm acceptance.");
+        var timingOnly = config with { Results = [], Confirmed = true };
+        var timingFeedback = JsonSerializer.SerializeToElement(new { timing = "excellent", tempo = "none", shotType = "timing" });
+        for (int i = 201; i <= 203; i++) timingOnly = timingOnly.Feedback(p, settings, timingFeedback, Receipt(i), observation);
+        if ((timingOnly with { Confirmed = true }).Accepted(p, settings)) throw new Exception("Plain TIMING Excellent falsely confirmed rhythm calibration.");
+        Reject(() => timingOnly.Feedback(p, settings, JsonSerializer.SerializeToElement(new { timing = "excellent", tempo = "excellent", shotType = "timing" }), Receipt(204), observation),
+            "Contradictory TIMING feedback with a tempo grade was accepted.");
         var forged = ((IVisionCaptureProfile)p).ConfigureLiveAssistance(settings with { PluginAssistance = new NbaMeterSettings().Export() }, config.Export());
         if(forged.Deserialize<NbaMeterSettings>(NbaMeterSettings.Json)!.Results.Length != 0) throw new Exception("UI configuration manufactured action receipts.");
+        var changed = ((IVisionCaptureProfile)p).ConfigureLiveAssistance(settings with { PluginAssistance = config.Export() },
+            (config with { StrokeDurationMs = 56, Results = [] }).Export()).Deserialize<NbaMeterSettings>(NbaMeterSettings.Json)!;
+        if (!changed.Results.SequenceEqual(config.Results) || changed.Accepted(p, settings))
+            throw new Exception("Configuring the next trial lost prior results or counted results from different timings.");
         using var predictor = ((IVisionCaptureProfile)p).CreateLivePredictor(settings with { PluginAssistance = config.Export() })!;
         byte[] frame = new byte[1280*720*4];
         predictor.Observe(frame,1280,720,5120,1,1,200,new(null,0,1,0,0,false));
@@ -177,6 +206,23 @@ internal static class MeterChecks
         var empty = new NbaMeterDetector(new());
         for(int y=100;y<108;y++)for(int x=200;x<210;x++){int o=y*5120+x*4;frame[o+1]=220;}
         if(empty.Detect(frame,1280,720,5120) is not null) throw new Exception("A lone colored patch was mistaken for a meter.");
+        var paddleSettings = config with { Trigger = "largeRight" };
+        paddleSettings.Validate();
+        if (paddleSettings.Action(p, settings).TriggerPaddle != PaddleButtons.LargeRight)
+            throw new Exception("Paddle trigger did not map to LargeRight.");
+        if (paddleSettings.Key(p, settings) == config.Key(p, settings))
+            throw new Exception("Changing the shot trigger did not isolate calibration keys.");
+        Reject(() => (config with { Trigger = "invalidPaddle" }).Validate(), "Unsupported trigger was accepted.");
+        using var paddlePredictor = ((IVisionCaptureProfile)p).CreateLivePredictor(settings with { PluginAssistance = paddleSettings.Export() })!;
+        var idleObserve = paddlePredictor.Observe(frame, 1280, 720, 5120, 1, 1, Stopwatch.GetTimestamp(),
+            new(default(ControllerState), Stopwatch.GetTimestamp(), 1, 0, 0, false));
+        if (idleObserve.Message != "Waiting for your paddle hold.")
+            throw new Exception("Paddle predictor did not wait for the configured paddle.");
+        long holdTs = Stopwatch.GetTimestamp();
+        var paddleObserve = paddlePredictor.Observe(frame, 1280, 720, 5120, 2, 1, holdTs,
+            new(default(ControllerState), holdTs, 1, 1, holdTs, true) { HoldStartedTimestamp = holdTs, HeldPaddles = PaddleButtons.LargeRight });
+        if (paddleObserve.Message == "Waiting for your paddle hold.")
+            throw new Exception("Paddle predictor ignored a held LargeRight paddle when the right stick stayed centered.");
         Console.WriteLine("SUCCESS Meter calibration: no tag/model prerequisite, native receipt provenance, duplicate/result/context/resolution guards and explicit confirmation.");
     }
     private static void Reject(Action action,string message) { try {action();} catch(InvalidDataException){return;} throw new Exception(message); }

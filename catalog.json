@@ -4,14 +4,14 @@
     {
       "id": "nba2k27-training",
       "name": "NBA 2K27 Assistance & Training",
-      "description": "Direct curved-meter detection with guided practice calibration, controller readiness and explicit shot feedback. Optional animation-model training and clip review. Meter detection runs on CPU without pose/OCR. Requires Studio beta.33 or newer.",
+      "description": "Curved-meter assistance with RHYTHM/TIMING feedback, calibration without a separate tempo grade, bounded timing adjustments and recorded assisted trials. Requires Studio beta.38 or newer.",
       "author": "AccessRelay",
-      "version": "1.2.3",
+      "version": "1.2.17",
       "kind": "training-plugin",
       "gameId": "nba2k27",
       "license": "0BSD; capture models Apache-2.0",
-      "manifestPath": "packages/nba2k27-training/1.2.3/pack.json",
-      "manifestSha256": "4474bd97dc8eb41cb8ff99519ab3edd08858b6fa8530d30a04a33ce0666e4842",
+      "manifestPath": "packages/nba2k27-training/1.2.17/pack.json",
+      "manifestSha256": "7b61203229096e066d0fff13d4ab480fbcd5364f408b5ae53ef5f878006d9841",
       "tags": [
         "nba2k27",
         "training",
@@ -21,19 +21,20 @@
     },
     {
       "id": "nba2k27",
-      "name": "NBA 2K27 Rhythm Script",
-      "description": "Optional NBA 2K27 rhythm controller script. Training is provided by the separate NBA 2K27 Model Training plugin.",
+      "name": "NBA 2K27 Shot Trainer",
+      "description": "Standing Still, Off-Dribble and Fade-Away shot baselines with isolated shot-input Lua playback. Tap once to play the whole shot; live movement stays manual. Timing and tempo edits retain Run scripts. Requires Studio beta.42 or newer.",
       "author": "AccessRelay",
-      "version": "1.0.1",
-      "kind": "script",
+      "version": "2.0.1",
+      "kind": "controller-profile",
       "license": "0BSD",
-      "manifestPath": "packages/nba2k27/1.0.1/pack.json",
-      "manifestSha256": "68e734b24b64021734d33c4daf57612be9d4b97e4c2d464e519cce7bda1a5a58",
+      "manifestPath": "packages/nba2k27/2.0.1/pack.json",
+      "manifestSha256": "316aaed675db4821dfdd9bc010b7aa89b39ec722c83e0012f636e2bb985d2de7",
       "tags": [
         "nba2k27",
-        "training",
-        "vision",
-        "controller"
+        "controller",
+        "baseline",
+        "lua",
+        "shot-trainer"
       ],
       "gameId": "nba2k27"
     }

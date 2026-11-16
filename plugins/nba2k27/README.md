@@ -1,8 +1,130 @@
 # NBA 2K27 implementation
 
-## Direct meter assistance (1.2.3; Studio beta.33+)
+## Direct meter assistance (1.2.12; Studio beta.38+)
 
-Choose **Shot meter · direct detection** in Live Gameplay or Model Training.
+Version 1.2.12 records the game's feedback heading separately from its grades.
+An explicitly reported **RHYTHM — EXCELLENT** result counts toward the three-shot
+calibration requirement even when the game shows no separate Tempo grade. Its
+tempo stays `none`; no Excellent tempo is manufactured. **TIMING — EXCELLENT**
+alone never confirms a rhythm shot. When a separate tempo grade is shown, it
+must be Excellent to count. Existing separate timing/tempo results remain valid.
+Receipt, setup, capture-size and explicit-confirmation checks still apply.
+
+A controlled replay of a captured manual right-stick motion through the virtual
+controller produced RHYTHM — EXCELLENT with no physical input detected. A separate
+830 ms down hold and 56 ms generated ramp produced TIMING — LATE. The replay
+establishes that the virtual path can deliver a recognized rhythm shot; it does
+not establish Live detector timing accuracy or resolve competing physical input
+during an assisted shot. This release fixes feedback acceptance, not that remaining
+Live timing investigation.
+
+Version 1.2.11 restores the Model Training recording/review workspace regardless
+of the selected Live assistance method. Opening training never changes timing or
+arms output. Live meter assistance also handles a missing settings snapshot
+without repeatedly rendering, then adopts settings when they arrive. The full
+seven-file UI suite covers both assistance methods, recording, clip review,
+profile/label drafts, plugin selection, calibration and feedback compatibility.
+
+Version 1.2.10 restores feedback-driven practice calibration. **Save result** first
+stores the completed action against its original settings, then applies the next
+trial's settings and restarts the preview with assistance off. Late/Early moves
+the timing correction by 8 ms, Slightly late/early by 4 ms. Fast/Slow changes
+stroke duration by 4 ms, Slightly fast/slow by 2 ms. Excellent leaves that setting
+unchanged; No tempo shown never guesses a stroke adjustment. The save notice
+shows the actual changes. Start the next practice trial explicitly.
+
+Saved evidence includes the actual correction and stroke duration. When opposite
+feedback brackets a value in the same setup, resolution and other timing value,
+subsequent steps shrink toward the midpoint instead of overshooting repeatedly.
+Automatic correction stays within -120 to +120 ms (manual values outside that
+range can move inward); stroke duration retains its 8–500 ms limits. Reaching a
+limit is reported with a request to inspect settings and diagnostics. These are
+conservative search limits, not measured game or capture latency. If applying an
+adjustment fails, the result stays saved and the next trial is blocked until the
+settings are retried or explicitly discarded. Prior results remain attached to
+their original setup and cannot count toward a changed calibration. Three matching
+Excellent timing/tempo results still require explicit confirmation.
+
+Version 1.2.8 makes **Save result** save feedback without changing timing or
+restarting capture. The previous automatic adjustment stacked -80 ms after each
+Late/no-tempo result; repeated saves could move the requested stroke start before
+the first usable forecast. Timing edits remain explicit in Advanced settings.
+Saved results and their original configuration keys are retained. Start each
+practice trial explicitly after saving. This change does not establish the cause
+of missing in-game tempo feedback or measure end-to-end capture/output latency.
+
+Version 1.2.7 fixes the practice recording flow. A calibration trial pauses after
+one completed action, which previously left subsequent recordings with live
+detector forecasts but automatic reversal off. The page now always shows the
+actual On/Off state and explains the pause. **Record assisted trial** starts the
+diagnostic recorder before explicitly arming one shot. If a previous result is
+unsaved, **Skip result and record next trial** explicitly skips that feedback;
+saved calibration results are kept. A recording or arming failure keeps the
+pending feedback available and attempts cleanup. **Record diagnostics** remains
+an observation recording using the current assistance state. Accepted assistance
+can use **Record assisted shots** and stays on until paused. This update preserves
+the detector, timing policy and calibration keys from 1.2.6.
+
+Version 1.2.6 fixes detector/scheduler failures reproduced from the user's retained
+1440p diagnostic footage. Green Excellent feedback could match a curved poster
+edge and be acquired as a meter; acquisition now requires a flat neutral ribbon
+interior across the fitted curve. Nearby cap fragments are grouped using cap size,
+scale and overlapping ribbon geometry, while separate meters remain ambiguous.
+When compression fragments the target cap, the detector also tests the previous
+full ribbon shape against the current pixels instead of shrinking its height
+from the smaller cap fragment alone.
+
+Fill is normalized over the actual scanned, fillable span below the colored cap.
+Previously the scan stopped near 90% of the fitted shape but the timing target was
+100%, producing a false late stall. The host now applies the configured maximum
+frame age at stroke start as it does during the stroke; it no longer has an
+undocumented 25 ms cutoff. No target-time shortcut, repeated image or saved
+forecast is used to bypass freshness or tracking failures.
+
+Device-free replay of all 405 retained images in the full-hold diagnostic produced
+three completed native action receipts. The same replay retains missing images
+as gaps and sends no controller output. The armed recording's feedback-box false
+matches were rejected. These are regression results, not measured Xbox timing or
+an Excellent-shot rate. The changed fill scale requires matching practice results;
+saved clips and prior calibration receipts are preserved.
+
+Version 1.2.5 anchors hold qualification and acquisition timeouts to the host's
+physical input transition, including presses between video frames. One short
+missing detection retains the meter identity for at most 70 ms and clears the fit
+history. Identity changes, ambiguous meters, expired identity, broken cadence and
+loss of tracking after a forecast cancel the attempt until neutral or a verified
+new physical press. Armed assistance requires the host's actual hold timestamp.
+
+Saved timing forecasts are never replayed as fresh observations. Only after the
+host has actually crossed the stroke's timing anchor may expected meter
+disappearance or cap saturation request completion of that same stroke. This is
+reported explicitly without a new target estimate; it cannot start or move a
+stroke deadline. Ambiguity and identity/progression failures still cancel, even
+after the anchor. The scheduler separately validates phase and frame freshness.
+Runtime contract 3 requires the matching host; the policy change requires fresh
+practice calibration. Existing receipts remain saved.
+
+**Record assisted trial** saves up to 15 seconds and enables the practice shot in
+one action. **Record diagnostics** saves alongside the current preview without
+changing assistance; when automatic reversal is off it records observations only.
+Stop after the failed attempt or let it finish automatically. **Open diagnostic
+folder** reveals `diagnostic.json`, the original native-resolution BGRA frames
+(individually gzip-compressed), and `review.html`. Open the viewer and choose that
+folder to scrub through the images, fill graph, measured velocity, forecast,
+uncertainty, frame intervals, controller states and output decisions offline.
+Recordings live under the application's `Diagnostics/VisionRecordings` folder.
+No training setup, model, calibration receipt or successful reversal is required.
+
+The recorder retains detection details for each processed frame even when its
+three-image queue is full. Image skips, copy/queue/write times and capture-pipeline
+counters are explicit. Recording adds local overhead; compare cadence with an
+unrecorded attempt. The compressed-image limit is 1 GiB plus at most one final
+image. Stopping preview finalizes recording. Controller readings accompany video
+frames; they do not establish Xbox input receipt or render-to-capture latency.
+Rejected fill-velocity readings now retain their measured value in diagnostics.
+
+Choose **Shot meter · direct detection** in Live Gameplay. Model Training opens
+the recording, clip-review and offline training workspace.
 Select a meter-on shot profile and enable the **Curved** meter in the game.
 The CPU detector acquires the colored target cap and curved ribbon across the
 gameplay viewport, follows a moving ROI, and measures the bottom-connected white
@@ -29,15 +151,15 @@ backward progression and broken cadence invalidate the attempt. Rolling
 past/present-only fits report velocity, forecast and uncertainty. Noisy fits
 withhold updates; they cannot refresh the host's valid-forecast deadline.
 
-The preview and practice panel sit together. Readiness shows whether gameplay is
-capturing and controller output is connected; connection errors appear beside the
+The preview and practice panel sit together. Readiness shows whether automatic
+reversal is on, gameplay is capturing and controller output is connected; connection errors appear beside the
 controls. Start the preview, connect output if needed, then choose **Start practice
 trial**. Hold the physical input until the reversal finishes, then return neutral.
 The page pauses a trial started there when its new native action receipt arrives.
 Opening the page never starts capture, connects output or arms assistance.
 
 After a completed action, select the timing and tempo NBA actually reported and
-choose **Save result**. Feedback starts blank. Three matching Excellent results
+choose **Save result** to tune the next practice trial. Feedback starts blank. Three matching Excellent results
 enable **Save calibration**. An existing unconfirmed set from another app session
 requires a fresh completed action before confirmation.
 
@@ -56,7 +178,9 @@ requests cadence and does not guarantee Windows or Xbox delivery at that cadence
 The ramp is committed at start, not repeatedly warped after motion begins.
 
 Normal assistance needs three native completed-action receipts with Excellent
-timing and (for rhythm) Excellent tempo, followed by explicit confirmation. The
+timing. Rhythm mode also requires an explicit RHYTHM heading when no separate
+tempo is shown, or Excellent tempo when a separate grade is reported. Results
+still need explicit confirmation. The
 page refreshes the preview after confirmation and leaves assistance off until started.
 Receipts bind feedback to the actual local action and reject duplicate feedback.
 Profile, camera, meter appearance, game build, capture source, resolution and timing

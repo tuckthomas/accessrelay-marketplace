@@ -28,6 +28,9 @@ export function Nba2K27VisionWorkspace(props: VisionWorkspaceProps) {
       ...props.state?.settings?.pluginAssistance, enabled: next === 'meter' }, props.state?.settings ?? {})); setMethod(next); }
     catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); }
   }
+  // Training owns clip recording and review regardless of the selected Live
+  // assistance method. Opening training must never configure or arm output.
+  if (props.mode === 'training') return <AnimationWorkspace {...props} />;
   return <div className="page-stack"><style>{styles}</style>
     <Field label="Assistance method"><Select value={method} disabled={busy || !!s.session?.running || !!s.stopping} onValueChange={next => { if (hasUnsavedChanges()) setPendingMethod(next); else void switchMethod(next); }}>
       <SelectOption value="meter">Shot meter · direct detection</SelectOption><SelectOption value="animation">Animation model · meter off</SelectOption></Select></Field>

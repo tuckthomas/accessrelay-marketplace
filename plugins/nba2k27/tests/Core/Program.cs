@@ -1,5 +1,11 @@
 using EliteScriptStudio.Core;
 
+if (args is ["--meter-continuity"]) { MeterContinuityChecks.Run(); return; }
+if (args is ["--meter-fixtures", var oldMeterSession, var armedMeterDiagnostic, var heldMeterReplay])
+{ MeterDetectorFixtureChecks.Run(oldMeterSession, armedMeterDiagnostic, heldMeterReplay); return; }
+if (args is ["--meter-diagnostic", var diagnosticDirectory, var diagnosticOutput])
+{ MeterDiagnosticChecks.Inspect(diagnosticDirectory, diagnosticOutput); return; }
+
 if (args is ["--meter-calibration"]) { MeterChecks.Calibration(); return; }
 
 if (args is ["--meter-recorded", var meterDirectory, var meterOutput])

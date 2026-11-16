@@ -28,6 +28,17 @@ for item in catalog['entries']:
     if item['kind'] == 'training-plugin':
         assert manifest['gameId'] and not manifest['bindings']
     assert len(manifest['assets']) <= 40
+    if 'controllerTrainer' in manifest:
+        trainer = manifest['controllerTrainer']
+        assert manifest.get('gameId') and manifest.get('trainingAdapter', 'none') == 'none'
+        assert 1 <= len(trainer['shots']) <= 8
+        assert len({shot['id'] for shot in trainer['shots']}) == len(trainer['shots'])
+        for group in ('timingFeedback', 'tempoFeedback'):
+            choices = trainer[group]
+            assert 1 <= len(choices) <= 16 and len({choice['id'] for choice in choices}) == len(choices)
+            assert all(isinstance(choice['adjustmentMs'], int) and abs(choice['adjustmentMs']) <= 100 for choice in choices)
+            assert any(choice['id'] == 'none' and choice['adjustmentMs'] == 0 for choice in choices)
+        assert path.read_bytes() == (root / 'plugins/controller-trainer/pack.json').read_bytes()
     for asset in manifest['assets']:
         parts = Path(asset['path']).parts
         assert not Path(asset['path']).is_absolute() and '..' not in parts and ':' not in asset['path']
@@ -40,7 +51,7 @@ for item in catalog['entries']:
         assert hashlib.sha256(data).hexdigest() == asset['sha256']
     if 'runtime' in manifest:
         runtime = manifest['runtime']
-        assert runtime['contractVersion'] in (1, 2)
+        assert runtime['contractVersion'] in (1, 2, 3)
         declared = {a['path']: a['kind'] for a in manifest['assets']}
         for key, kind in [('assembly','runtime'), ('uiEntry','ui'), ('trainingEntry','workflow'), ('auditEntry','workflow'), ('experimentsEntry','workflow')]:
             assert declared[runtime[key]] == kind

@@ -2,23 +2,70 @@ using EliteScriptStudio.Core;
 
 namespace EliteScriptStudio.Packs.Nba2K27;
 
+internal interface INbaMeterDetector
+{
+    NbaMeterDetector.Measurement? Detect(ReadOnlySpan<byte> pixels, int width, int height, int stride);
+    bool Ambiguous { get; }
+    void Reset();
+}
+
 /// <summary>CPU-only curved-meter geometry. Acquisition never consults a player, tag, court or neural model.</summary>
-internal sealed class NbaMeterDetector(NbaMeterSettings settings)
+internal sealed class NbaMeterDetector(NbaMeterSettings settings) : INbaMeterDetector
 {
     internal readonly record struct Measurement(VisionCrop Bounds, double Progress, double Score, double Height, double TargetX, double TargetY,
         double Bow = 0, double End = 0, double Thickness = 0);
     private bool[] _mask = [];
     private int[] _queue = [];
     private Measurement? _previous;
+    private double _velocityX, _velocityY;
+    private int _emptyOutlineStreak;
     private readonly record struct Cap(double X, double Y, double Width, int Area);
-    internal void Reset() => _previous = null;
+    public bool Ambiguous { get; private set; }
+    public void Reset() { _previous = null; _velocityX = _velocityY = 0; _emptyOutlineStreak = 0; Ambiguous = false; }
 
-    internal Measurement? Detect(ReadOnlySpan<byte> pixels, int width, int height, int stride)
+    public Measurement? Detect(ReadOnlySpan<byte> pixels, int width, int height, int stride)
     {
-        var search = _previous is { } last ? Expand(last.Bounds, .6) : settings.Viewport;
+        Ambiguous = false;
+        var search = _previous is { } last ? Expand(ShiftPredicted(last.Bounds, _velocityX, _velocityY), .6) : settings.Viewport;
         var result = Search(pixels, width, height, stride, search);
         if (result is null && _previous is not null) result = Search(pixels, width, height, stride, settings.Viewport);
-        _previous = result;
+        // The predictor bounds how long identity may survive a missing detection.
+        if (result is { } found)
+        {
+            if (found.Progress <= .03 && found.Score < .75)
+                _emptyOutlineStreak++;
+            else
+                _emptyOutlineStreak = 0;
+
+            // Persistent weak empty outlines must not trap the search crop away from the real meter,
+            // while brief low-fill outlines (e.g., far-court shots) still retain localized tracking.
+            if (_emptyOutlineStreak >= 4)
+            {
+                _previous = null;
+                _velocityX = _velocityY = 0;
+                _emptyOutlineStreak = 0;
+            }
+            else
+            {
+                if (_previous is { } previous)
+                {
+                    double dx = Math.Clamp(found.Bounds.Left - previous.Bounds.Left, -.06, .06);
+                    double dy = Math.Clamp(found.Bounds.Top - previous.Bounds.Top, -.06, .06);
+                    _velocityX = _velocityX * .4 + dx * .6;
+                    _velocityY = _velocityY * .4 + dy * .6;
+                }
+                else
+                {
+                    _velocityX = _velocityY = 0;
+                }
+                _previous = found;
+            }
+        }
+        else
+        {
+            _velocityX *= .5;
+            _velocityY *= .5;
+        }
         return result;
     }
     private Measurement? Search(ReadOnlySpan<byte> pixels, int width, int height, int stride, VisionCrop search)
@@ -57,26 +104,42 @@ internal sealed class NbaMeterDetector(NbaMeterSettings settings)
             caps.Add(new(left+sumX/tail*step,top+sumY/tail*step,Math.Sqrt(w*w+h*h),tail));
         }
         Measurement? best=null;double second=0;
-        foreach(var cap in caps.OrderByDescending(c=>c.Area).Take(24))
+        foreach(var cap in caps.OrderByDescending(c=>c.Area).Take(40))
         {
             Measurement? candidate=null;
-            for(double ratio=7;ratio<=14;ratio+=.5)for(int side=-1;side<=1;side+=2)for(double bow=.16;bow<=.281;bow+=.04)for(double end=-.16;end<=.001;end+=.08)
+            double baseWidth = _previous is { } priorCap && Math.Abs(cap.X - priorCap.TargetX) < width * .08 && Math.Abs(cap.Y - priorCap.TargetY) < height * .08
+                ? Math.Max(cap.Width, priorCap.Thickness * .85) : cap.Width;
+            for(double ratio=7;ratio<=14;ratio+=.5)for(int side=-1;side<=1;side+=2)for(double bow=.16;bow<=.281;bow+=.04)for(double end=-.24;end<=.081;end+=.08)
             {
-                double h=cap.Width*ratio;if(h<height*.035||h>height*.38||cap.Y+h>=height)continue;
-                double score=Score(pixels,width,height,stride,cap.X,cap.Y,h,side*bow*h,side*end*h,cap.Width);
-                if(_previous is { } prior) score-=Math.Min(.04,Math.Abs(h/prior.Height-1)*.08);
+                double h=baseWidth*ratio;if(h<height*.035||h>height*.38||cap.Y+h>=height)continue;
+                double score=Score(pixels,width,height,stride,cap.X,cap.Y,h,side*bow*h,side*end*h,baseWidth);
+                if(_previous is { } prior) score-=Math.Min(.18,Math.Abs(h/prior.Height-1)*.35);
                 if(candidate is null||score>candidate.Value.Score)
                 {
-                    double l=Math.Max(0,cap.X+Math.Min(0,side*(bow+end)*h)-cap.Width-Math.Abs(end*h)),r=Math.Min(width,cap.X+Math.Max(0,side*(bow+end)*h)+cap.Width+Math.Abs(end*h));
-                    double topY=Math.Max(0,cap.Y-cap.Width),bottom=Math.Min(height,cap.Y+h+cap.Width);
+                    double l=Math.Max(0,cap.X+Math.Min(0,side*(bow+end)*h)-baseWidth-Math.Abs(end*h)),r=Math.Min(width,cap.X+Math.Max(0,side*(bow+end)*h)+baseWidth+Math.Abs(end*h));
+                    double topY=Math.Max(0,cap.Y-baseWidth),bottom=Math.Min(height,cap.Y+h+baseWidth);
                     var bounds=new VisionCrop(l/width,topY/height,(r-l)/width,(bottom-topY)/height);
-                    candidate=new(bounds,0,score,h,cap.X,cap.Y,side*bow*h,side*end*h,cap.Width);
+                    candidate=new(bounds,0,score,h,cap.X,cap.Y,side*bow*h,side*end*h,baseWidth);
+                }
+            }
+            // Validate the previous full ribbon against this frame. A fragmented cap
+            // must not force a shorter meter when the original ribbon is still visible.
+            if (_previous is { } tracked && Math.Abs(cap.X-tracked.TargetX)<width*.04 && Math.Abs(cap.Y-tracked.TargetY)<height*.04)
+            {
+                double score=Score(pixels,width,height,stride,cap.X,cap.Y,tracked.Height,tracked.Bow,tracked.End,tracked.Thickness);
+                if(score>=.55 && (candidate is null || score>=candidate.Value.Score-.015))
+                {
+                    double dx=(cap.X-tracked.TargetX)/width,dy=(cap.Y-tracked.TargetY)/height;
+                    double l=Math.Clamp(tracked.Bounds.Left+dx,0,1),t=Math.Clamp(tracked.Bounds.Top+dy,0,1);
+                    candidate=tracked with { TargetX=cap.X,TargetY=cap.Y,Score=score,
+                        Bounds=new(l,t,Math.Min(tracked.Bounds.Width,1-l),Math.Min(tracked.Bounds.Height,1-t)) };
                 }
             }
             if(candidate is not { } value || value.Score<.55)continue;
-            if(best is null || value.Score>best.Value.Score){second=best?.Score??0;best=value;}else second=Math.Max(second,value.Score);
+            bool sameMeter = best is { } current && SameCap(value,current);
+            if(best is null || value.Score>best.Value.Score){if(!sameMeter)second=best?.Score??0;best=value;}else if(!sameMeter)second=Math.Max(second,value.Score);
         }
-        if(best is { } found && second>found.Score-.06)return null;
+        if(best is { } found && second>found.Score-.06){Ambiguous=true;return null;}
         if(best is not { } selected)return null;
         if(_previous is { } previous && Math.Abs(selected.TargetX-previous.TargetX)<width*.08 && Math.Abs(selected.TargetY-previous.TargetY)<height*.08
             && selected.Height/previous.Height is > .75 and < 1.25)
@@ -89,23 +152,42 @@ internal sealed class NbaMeterDetector(NbaMeterSettings settings)
         }
         return selected with { Progress = Progress(pixels,width,height,stride,selected) };
     }
+    private static bool SameCap(Measurement a,Measurement b)
+    {
+        double radius=Math.Min(a.Thickness,b.Thickness)*.75;
+        if(Math.Abs(a.TargetX-b.TargetX)>radius || Math.Abs(a.TargetY-b.TargetY)>radius || a.Height/b.Height is < .75 or > 1.25)return false;
+        double intersectionWidth=Math.Max(0,Math.Min(a.Bounds.Left+a.Bounds.Width,b.Bounds.Left+b.Bounds.Width)-Math.Max(a.Bounds.Left,b.Bounds.Left));
+        double intersectionHeight=Math.Max(0,Math.Min(a.Bounds.Top+a.Bounds.Height,b.Bounds.Top+b.Bounds.Height)-Math.Max(a.Bounds.Top,b.Bounds.Top));
+        return intersectionWidth*intersectionHeight>=.6*Math.Min(a.Bounds.Width*a.Bounds.Height,b.Bounds.Width*b.Bounds.Height);
+    }
     private static double Score(ReadOnlySpan<byte> p,int width,int height,int stride,double x,double y,double h,double bow,double end,double w)
     {
-        double total=0;
+        double total=0;int supported=0;
         for(int row=2;row<30;row++)
         {
             double t=row/30d,cx=x+bow*4*t*(1-t)+end*t,cy=y+h*t;
             double slope=(bow*4*(1-2*t)+end)/h,nx=1/Math.Sqrt(1+slope*slope),ny=-slope*nx;
             var middle=Pixel(p,width,height,stride,cx,cy);
-            double a=Pixel(p,width,height,stride,cx-nx*w*.6,cy-ny*w*.6).Luma;
-            double b=Pixel(p,width,height,stride,cx+nx*w*.6,cy+ny*w*.6).Luma;
-            double neutral=middle.Chroma<25 && middle.Luma is >55 and <250 ? 1:0;
-            double contrast=Math.Clamp(Math.Min(middle.Luma-a,middle.Luma-b)/55,0,1);
-            double rimA=Pixel(p,width,height,stride,cx-nx*w*.32,cy-ny*w*.32).Luma;
-            double rimB=Pixel(p,width,height,stride,cx+nx*w*.32,cy+ny*w*.32).Luma;
-            total+=neutral*.2+contrast*.3+Math.Clamp(Math.Min(rimA-a,rimB-b)/50,0,1)*.5;
+            var outA=Pixel(p,width,height,stride,cx-nx*w*.6,cy-ny*w*.6);
+            var outB=Pixel(p,width,height,stride,cx+nx*w*.6,cy+ny*w*.6);
+            double neutral=middle.Chroma<25 && middle.Luma>55 ? 1:0;
+            double sepA=Math.Max(Math.Abs(middle.Luma-outA.Luma),(outA.Chroma-middle.Chroma)*.7);
+            double sepB=Math.Max(Math.Abs(middle.Luma-outB.Luma),(outB.Chroma-middle.Chroma)*.7);
+            double contrast=Math.Clamp(Math.Min(sepA,sepB)/55,0,1);
+            var rimA=Pixel(p,width,height,stride,cx-nx*w*.32,cy-ny*w*.32);
+            var rimB=Pixel(p,width,height,stride,cx+nx*w*.32,cy+ny*w*.32);
+            double rimSepA=Math.Max(Math.Abs(rimA.Luma-outA.Luma),(outA.Chroma-rimA.Chroma)*.7);
+            double rimSepB=Math.Max(Math.Abs(rimB.Luma-outB.Luma),(outB.Chroma-rimB.Chroma)*.7);
+            var innerA=Pixel(p,width,height,stride,cx-nx*w*.1,cy-ny*w*.1);
+            var innerB=Pixel(p,width,height,stride,cx+nx*w*.1,cy+ny*w*.1);
+            if(middle.Chroma<35 && innerA.Chroma<35 && innerB.Chroma<35
+                && Math.Min(middle.Luma,Math.Min(innerA.Luma,innerB.Luma))>70
+                && Math.Max(middle.Luma,Math.Max(innerA.Luma,innerB.Luma))-Math.Min(middle.Luma,Math.Min(innerA.Luma,innerB.Luma))<18)supported++;
+            total+=neutral*.2+contrast*.3+Math.Clamp(Math.Min(rimSepA,rimSepB)/50,0,1)*.5;
         }
-        return Math.Min(1,total/28*1.6);
+        // A ribbon has a flat neutral interior across its width. Poster/text strokes
+        // below a green feedback box can otherwise achieve a plausible edge score.
+        return supported>=12 ? Math.Min(1,total/28*1.6*(supported>=14?1d:.88)) : 0;
     }
     private double Progress(ReadOnlySpan<byte> p,int width,int height,int stride,Measurement meter)
     {
@@ -142,7 +224,9 @@ internal sealed class NbaMeterDetector(NbaMeterSettings settings)
             }
             // The detached horizontal tempo tick cannot satisfy the bottom-connected, vertical fill test.
             if(top+maxY<meter.TargetY+meter.Height*.72 || maxY-minY<meter.Thickness*.8 || tail<5 || maxX-minX>meter.Height*.7)continue;
-            if(tail>bestArea){bestArea=tail;progress=Math.Clamp((meter.TargetY+meter.Height-(top+minY))/meter.Height,0,1);}
+            // The top tenth contains the colored cap and is excluded from this scan.
+            // Fill reaches 100% at that measurable cap boundary, not inside the cap.
+            if(tail>bestArea){bestArea=tail;progress=Math.Clamp((meter.TargetY+meter.Height-(top+minY))/(meter.Height*.9),0,1);}
         }
         return progress;
     }
@@ -155,6 +239,12 @@ internal sealed class NbaMeterDetector(NbaMeterSettings settings)
     {
         int max=Math.Max(r,Math.Max(g,b)),min=Math.Min(r,Math.Min(g,b)),delta=max-min;if(delta==0)return 0;
         double hue=max==r?60d*(g-b)/delta:max==g?120+60d*(b-r)/delta:240+60d*(r-g)/delta;return hue<0?hue+360:hue;
+    }
+    private static VisionCrop ShiftPredicted(VisionCrop b, double dx, double dy)
+    {
+        double l = Math.Clamp(b.Left + dx, 0, Math.Max(0, 1 - b.Width));
+        double t = Math.Clamp(b.Top + dy, 0, Math.Max(0, 1 - b.Height));
+        return b with { Left = l, Top = t };
     }
     private static VisionCrop Expand(VisionCrop b,double factor)
     {

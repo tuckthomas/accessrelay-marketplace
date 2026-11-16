@@ -65,8 +65,8 @@ internal sealed record Nba2K27ShotProfile(Guid Id, string Name, int HeightInches
     object IVisionCaptureProfile.DescribeLiveAssistance(VisionSettings settings)
     {
         var meter = NbaMeterSettings.Read(settings); meter.Validate(); string key = meter.Key(this, settings);
-        return new { key, accepted = meter.Accepted(this, settings), successfulTrials = meter.Results.Count(r => r.Key == key && r.Width == meter.CalibratedWidth && r.Height == meter.CalibratedHeight
-            && r.Timing == "excellent" && (meter.InputMode == "button" || r.Tempo == "excellent")),
+        return new { key, tuningContextKey = meter.TuningContextKey(this, settings), accepted = meter.Accepted(this, settings), successfulTrials = meter.Results.Count(r => r.Key == key && r.Width == meter.CalibratedWidth && r.Height == meter.CalibratedHeight
+            && meter.Successful(r)),
             currentResults = meter.Results.Where(r => r.Key == key).ToArray() };
     }
     JsonElement IVisionCaptureProfile.ApplyLiveCalibration(VisionSettings settings, JsonElement feedback,

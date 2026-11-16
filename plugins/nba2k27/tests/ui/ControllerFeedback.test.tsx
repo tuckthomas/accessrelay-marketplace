@@ -1,34 +1,41 @@
 import { selectValue } from '@studio/select-test-helper';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ControllerPage } from './TestHost';
-import { previewState } from '@studio/api';
+import { gameUiHost } from '@studio/game-plugins/registry';
+import { createPlugin } from '../../dist/ui/index.js';
+
 afterEach(cleanup);
-const setup=()=>structuredClone(previewState.controller);
-describe('NBA controller feedback integration',()=>{
-  it('reloads feedback-adjusted recording timing before a later edit is saved', async () => {
-    const state = setup(), id = '57e31ee3-bb31-45b7-adb5-99fb9059ade6';
-    state.activeProfile.gamePack = { id: 'nba2k27' };
-    let recording = { id, name: 'Test sequence', channels: 'rightStick', durationMs: 120, frames: [
-      { timeMs: 0, state: { buttons: 0, leftTrigger: 0, rightTrigger: 0, leftX: 0, leftY: 0, rightX: 0, rightY: -32767 } },
-      { timeMs: 80, state: { buttons: 0, leftTrigger: 0, rightTrigger: 0, leftX: 0, leftY: 0, rightX: 0, rightY: 32767 } }
-    ] };
-    state.activeProfile.recordings = [{ id, name: recording.name, durationMs: 120, frameCount: 2 }];
-    const command = vi.fn(async (action: string) => {
-      if (action === 'recordGet') return structuredClone(recording);
-      if (action === 'packAction') recording = { ...recording, durationMs: 136, frames: [recording.frames[0], { ...recording.frames[1], timeMs: 96 }] };
-      return null;
-    });
-    render(<ControllerPage state={state} status={state.status} command={command} />);
-    fireEvent.click(screen.getByRole('tab', { name: /Sequences/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
-    await screen.findByLabelText('Sequence name');
+const Tuning = createPlugin(gameUiHost).ControllerTuning!;
+
+describe('NBA controller feedback integration', () => {
+  // The current host uses Lua scripts rather than a Sequences tab. Test the
+  // installed plugin's compatibility contract with real shared host controls.
+  it('waits for the consumer to reload adjusted timing before reporting success', async () => {
+    const id = '57e31ee3-bb31-45b7-adb5-99fb9059ade6', command = vi.fn().mockResolvedValue(null);
+    let finishReload!: () => void;
+    const onApplied = vi.fn(() => new Promise<void>(resolve => { finishReload = resolve; }));
+    render(<Tuning id={id} command={command} onApplied={onApplied} />);
     fireEvent.click(screen.getByText('NBA 2K27 feedback tuning'));
     selectValue(screen.getByLabelText('Timing feedback'), 'slightlyEarly');
     fireEvent.click(screen.getByRole('button', { name: 'Apply feedback adjustment' }));
-    await waitFor(() => expect(command.mock.calls.filter(([action]) => action === 'recordGet')).toHaveLength(2));
-    fireEvent.change(screen.getByLabelText('Sequence name'), { target: { value: 'Renamed sequence' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save sequence' }));
-    await waitFor(() => expect(command).toHaveBeenCalledWith('recordUpdate', expect.objectContaining({ recording: expect.objectContaining({ durationMs: 136, name: 'Renamed sequence', frames: expect.arrayContaining([expect.objectContaining({ timeMs: 96 })]) }) })));
+    await waitFor(() => expect(onApplied).toHaveBeenCalledOnce());
+    expect(command).toHaveBeenCalledWith('packAction', { action: 'feedback', id, variant: undefined,
+      timingFeedback: 'slightlyEarly', tempoFeedback: 'none' });
+    expect(screen.queryByText('Feedback adjustment applied to the saved sequence.')).toBeNull();
+    expect((screen.getByRole('button', { name: 'Apply feedback adjustment' }) as HTMLButtonElement).disabled).toBe(true);
+    finishReload();
+    await screen.findByText('Feedback adjustment applied to the saved sequence.');
+    expect((screen.getByRole('button', { name: 'Apply feedback adjustment' }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('reports failed feedback without refreshing the consumer or reporting success', async () => {
+    const command = vi.fn().mockRejectedValue(new Error('That sequence no longer exists.')), onApplied = vi.fn();
+    render(<Tuning id="missing-recording" command={command} onApplied={onApplied} />);
+    fireEvent.click(screen.getByText('NBA 2K27 feedback tuning'));
+    selectValue(screen.getByLabelText('Tempo feedback'), 'slightlySlow');
+    fireEvent.click(screen.getByRole('button', { name: 'Apply feedback adjustment' }));
+    await screen.findByText('That sequence no longer exists.');
+    expect(onApplied).not.toHaveBeenCalled();
+    expect(screen.queryByText('Feedback adjustment applied to the saved sequence.')).toBeNull();
   });
 });

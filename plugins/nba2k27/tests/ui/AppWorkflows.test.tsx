@@ -47,6 +47,7 @@ describe('NBA workspace integration',()=>{
   });
   it('separates live gameplay and training, moves offline jobs out of Settings, and guards drafts between pages', async () => {
     state.vision.selectedPluginId = 'nba2k27';
+    state.vision.settings.pluginAssistance = { enabled: false };
     render(<App />); await screen.findByRole('heading', { name: 'Your workspace', exact: true });
     fireEvent.click(screen.getByRole('button', { name: 'Live Gameplay', exact: true }));
     expect(screen.queryByRole('button', { name: 'Record training clip' })).toBeNull();

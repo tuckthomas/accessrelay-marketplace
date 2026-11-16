@@ -14,7 +14,7 @@ function fixture(overrides: any = {}) {
   return { plugins: [{ id: 'nba2k27', name: 'NBA 2K27' }], selectedPluginId: 'nba2k27', profiles: [profile], selectedProfile: profile, selectedFingerprint: 'native-profile-fingerprint',
     sources: [{ id: 'window-one', title: 'Xbox Remote Play', processId: 100 }, { id: 'window-two', title: 'Another Remote Play window', processId: 200 }],
     selectedSourceId: 'window-one', models: [], modelScanComplete: true,
-    settings: { executionProvider: 'cuda', shootButton: 'x', minimumConfidence: .9, crop: all, trainingCapture: {
+    settings: { pluginAssistance: { enabled: false }, executionProvider: 'cuda', shootButton: 'x', minimumConfidence: .9, crop: all, trainingCapture: {
       configured: false, evidenceMode: 'anchored', sourceWidth: 1920, sourceHeight: 1080, gameplayRegion: all, meterRegion: { left: .1, top: .1, width: .1, height: .3 },
       feedbackRegion: { left: .1, top: .1, width: .4, height: .1 }, pluginConfiguration: { player: { left: .4, top: .3, width: .2, height: .5 }, meter: { left: .1, top: .1, width: .1, height: .3 }, court: [{ x: .05, y: .4 }, { x: .95, y: .4 }, { x: .99, y: .99 }, { x: .01, y: .99 }] }, purpose: 'meterSupervisedTraining', hudName: 'Prior HUD', gameBuild: 'synthetic-build', shotCategory: 'Mixed / unclassified' } },
     status: { session: null, stopping: false, training: null, notice: 'Choose your source.' }, ...overrides };

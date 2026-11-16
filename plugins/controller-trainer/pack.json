@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "apiVersion": 1,
+  "id": "nba2k27",
+  "version": "2.0.1",
+  "name": "NBA 2K27 Shot Trainer",
+  "description": "Standing Still, Off-Dribble and Fade-Away shot baselines with isolated shot-input Lua playback. Tap once to play the whole shot; live movement stays manual. Timing and tempo edits retain Run scripts. Requires Studio beta.42 or newer.",
+  "license": "0BSD",
+  "visionAdapter": "none",
+  "gameId": "nba2k27",
+  "trainingAdapter": "none",
+  "assets": [],
+  "bindings": [],
+  "tuning": [],
+  "presets": [],
+  "controllerTrainer": {
+    "shots": [
+      {
+        "id": "standing-still",
+        "label": "Standing Still",
+        "instructions": "Stand still in your practice area and record one complete shot with the selected shot input."
+      },
+      {
+        "id": "off-dribble",
+        "label": "Off-Dribble",
+        "instructions": "Dribble manually into the shot and record the selected shot input. Movement and other controls remain live when you tap the assigned input to replay the shot."
+      },
+      {
+        "id": "fade-away",
+        "label": "Fade-Away",
+        "instructions": "Move into your fade-away manually and record the selected shot input. Use the same movement and animation when you practice its one-tap shot playback."
+      }
+    ],
+    "timingFeedback": [
+      {
+        "id": "none",
+        "label": "No timing feedback",
+        "adjustmentMs": 0
+      },
+      {
+        "id": "early",
+        "label": "Early",
+        "adjustmentMs": 16
+      },
+      {
+        "id": "slightly-early",
+        "label": "Slightly Early",
+        "adjustmentMs": 8
+      },
+      {
+        "id": "excellent",
+        "label": "Excellent",
+        "adjustmentMs": 0
+      },
+      {
+        "id": "slightly-late",
+        "label": "Slightly Late",
+        "adjustmentMs": -8
+      },
+      {
+        "id": "late",
+        "label": "Late",
+        "adjustmentMs": -16
+      }
+    ],
+    "tempoFeedback": [
+      {
+        "id": "none",
+        "label": "No tempo feedback",
+        "adjustmentMs": 0
+      },
+      {
+        "id": "fast",
+        "label": "Fast",
+        "adjustmentMs": 8
+      },
+      {
+        "id": "slightly-fast",
+        "label": "Slightly Fast",
+        "adjustmentMs": 4
+      },
+      {
+        "id": "excellent",
+        "label": "Excellent",
+        "adjustmentMs": 0
+      },
+      {
+        "id": "slightly-slow",
+        "label": "Slightly Slow",
+        "adjustmentMs": -4
+      },
+      {
+        "id": "slow",
+        "label": "Slow",
+        "adjustmentMs": -8
+      }
+    ]
+  }
+}

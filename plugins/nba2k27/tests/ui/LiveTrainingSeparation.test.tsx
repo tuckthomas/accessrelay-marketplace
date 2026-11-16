@@ -13,7 +13,7 @@ it('shows NBA configuration only after the host selects the NBA plugin', async (
   view.rerender(<VisionPage state={{ ...state, selectedPluginId: 'nba2k27' }} status={{}} command={command} />);
   expect(screen.getByRole('combobox', { name: 'Shot profile' })).toBeTruthy();
   expect(screen.queryByRole('button', { name: 'Record training clip' })).toBeNull();
-  expect(screen.getByRole('heading', { name: 'Live analysis' })).toBeTruthy();
+  expect(screen.getByRole('heading', { name: 'Calibrate your shot' })).toBeTruthy();
   expect(screen.queryByText('Ready when you are')).toBeNull();
 });
 
@@ -22,11 +22,14 @@ it('keeps training and assistance on separate plugin surfaces', () => {
   const view = render(<VisionPage state={{ ...state, selectedPluginId: 'nba2k27' }} status={{}} command={command} mode="training" />);
   expect(screen.getByRole('heading', { name: 'Model Training' })).toBeTruthy();
   expect(screen.getByRole('button', { name: 'Record training clip' })).toBeTruthy();
+  expect(screen.getByRole('tab', { name: 'Clips & review' })).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'Start practice trial' })).toBeNull();
+  expect(screen.queryByRole('combobox', { name: 'Assistance method' })).toBeNull();
   expect(screen.queryByRole('heading', { name: 'Live analysis' })).toBeNull();
   expect(screen.queryByRole('button', { name: 'Detach' })).toBeNull();
   view.rerender(<VisionPage state={{ ...state, selectedPluginId: 'nba2k27' }} status={{}} command={command} mode="live" />);
   expect(screen.getByRole('heading', { name: 'Live Gameplay' })).toBeTruthy();
   expect(screen.queryByRole('tab', { name: 'Record clips' })).toBeNull();
-  expect(screen.getByRole('heading', { name: 'Live analysis' })).toBeTruthy();
+  expect(screen.getByRole('heading', { name: 'Calibrate your shot' })).toBeTruthy();
   expect(command).not.toHaveBeenCalled();
 });
