@@ -14,8 +14,8 @@ internal sealed class NbaMeterPredictor(Nba2K27ShotProfile profile, NbaMeterSett
     private double _bestUncertainty = double.PositiveInfinity, _bestConfidence;
     private string? _attemptFailure;
     private const double IdentityGraceMs = 70;
-    private const double CurveLogBias = 0.55;
-    private const double MinimumVelocityWindowMs = 45;
+    private const double CurveLogBias = 0.70;
+    private const double MinimumVelocityWindowMs = 58;
     private static readonly double CurveLogDenominator = Math.Log(1d + 1d / CurveLogBias);
     private bool _held, _forecasted;
     private bool _acquired;
@@ -171,13 +171,13 @@ internal sealed class NbaMeterPredictor(Nba2K27ShotProfile profile, NbaMeterSett
             double w = Math.Pow(.85, _count - 1 - i), error = Linearize(_history[i].Progress) - (mu + velocity * (_history[i].Time - mt));
             residual += w * error * error;
         }
-        double sigma = Math.Sqrt(residual / Math.Max(1, _count - 2));
+        double sigma = Math.Sqrt(residual / Math.Max(.5, sw * Math.Max(1, _count - 2) / _count));
         double fittedLinear = mu + velocity * (_history[_count - 1].Time - mt);
         double tau = (Linearize(configuration.TargetProgress) - fittedLinear) / velocity;
-        double extrap = Math.Min(Math.Max(0, tau), Math.Max(1, span));
+        double extrap = Math.Min(Math.Max(0, tau), Math.Max(1, span * 2.0));
         double localSlope = LinearDerivative(_history[_count - 1].Progress);
         // Recency-weighted regression on the linearized curve tracks acceleration cleanly across shot speeds.
-        double uncertainty = Math.Sqrt(sigma * sigma * (1 + 1d / _count + extrap * extrap / xx)
+        double uncertainty = Math.Sqrt(sigma * sigma * (1 + 1d / sw + extrap * extrap / xx)
             + (localSlope * localSlope) / (meter.Height * meter.Height)) / velocity;
         double confidence = Math.Clamp(meter.Score >= .55 && meter.Score < .7 ? Math.Min(.7, meter.Score + .12) : meter.Score, 0, 1);
         if (tau < 0)

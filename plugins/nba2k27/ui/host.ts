@@ -8,6 +8,7 @@ export let useState: GameUiHost['React']['useState'];
 export let useEffect: GameUiHost['React']['useEffect'];
 export let useRef: GameUiHost['React']['useRef'];
 export let GameplayPreview: GameUiHost['GameplayPreview'];
+export let ControllerTrainer: GameUiHost['ControllerTrainer'];
 export let ProfilePicker: GameUiHost['ui']['ProfilePicker'];
 export let Select: GameUiHost['ui']['Select'];
 export let SelectOption: GameUiHost['ui']['SelectOption'];
@@ -32,6 +33,7 @@ export function bindHost(host: GameUiHost) {
   if (host.apiVersion !== 1) throw new Error('This plugin requires Studio UI API 1.');
   React = host.React; ({ useState, useEffect, useRef } = host.React);
   GameplayPreview = host.GameplayPreview;
+  ControllerTrainer = host.ControllerTrainer;
   ({ ProfilePicker, Select, SelectOption, Input, Slider, Checkbox, Badge, Button, Card,
     DiscardDialog, EmptyState, Field, Icon, Modal, Notice, Tabs, Toggle, hasUnsavedChanges,
     useUnsavedChanges, humanize } = host.ui);

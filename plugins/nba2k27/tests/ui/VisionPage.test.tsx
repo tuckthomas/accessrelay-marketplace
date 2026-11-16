@@ -2,7 +2,7 @@ import { selectValue } from '@studio/select-test-helper';
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { VisionPage } from './TestHost';
+import { GameAddonPage, VisionPage } from './TestHost';
 import { hasUnsavedChanges } from '@studio/ui';
 
 afterEach(cleanup);
@@ -67,13 +67,13 @@ describe('vision workflows', () => {
 
   it('defaults to CPU preparation and saves experimental GPU as an inactive reviewed setting', async () => {
     const command = vi.fn().mockResolvedValue(null), state = fixture();
-    const view = render(<VisionPage mode="live" state={state} status={null} command={command} />);
+    const view = render(<GameAddonPage addon={{ gameId: 'nba2k27', pluginId: 'nba2k27', title: 'NBA 2K27' }} onBack={vi.fn()} state={state} status={null} command={command} />);
     fireEvent.click(screen.getByText('Analysis settings & measured calibration'));
     expect(screen.getByRole('combobox', { name: 'Image preparation' }).textContent).toContain('CPU');
     selectValue(screen.getByRole('combobox', { name: 'Image preparation' }), 'd3D11Cuda');
     expect(hasUnsavedChanges()).toBe(true);
     expect(screen.getByText(/Experimental GPU preparation is observation-only/)).toBeTruthy();
-    view.rerender(<VisionPage mode="live" state={{ ...state, settings: { ...state.settings } }} status={{ session: { canArm: true } }} command={command} />);
+    view.rerender(<GameAddonPage addon={{ gameId: 'nba2k27', pluginId: 'nba2k27', title: 'NBA 2K27' }} onBack={vi.fn()} state={{ ...state, settings: { ...state.settings } }} status={{ session: { canArm: true } }} command={command} />);
     expect((screen.getByRole('checkbox', { name: 'Automatic release' }) as HTMLInputElement).disabled).toBe(true);
     fireEvent.click(screen.getByRole('button', { name: 'Save analysis settings' }));
     await waitFor(() => expect(command).toHaveBeenCalledWith('settingsSave', { settings: expect.objectContaining({ executionProvider: 'cuda', preprocessingBackend: 'd3D11Cuda' }) }));
@@ -83,13 +83,13 @@ describe('vision workflows', () => {
   it('uses CPU preparation when the user explicitly chooses CPU inference and locks backend changes during capture', async () => {
     const command = vi.fn().mockResolvedValue(null), state = fixture();
     state.settings.preprocessingBackend = 'd3D11Cuda';
-    const view = render(<VisionPage mode="live" state={state} status={null} command={command} />);
+    const view = render(<GameAddonPage addon={{ gameId: 'nba2k27', pluginId: 'nba2k27', title: 'NBA 2K27' }} onBack={vi.fn()} state={state} status={null} command={command} />);
     fireEvent.click(screen.getByText('Analysis settings & measured calibration'));
     selectValue(screen.getByRole('combobox', { name: 'Inference device' }), 'cpu');
     expect(screen.getByRole('combobox', { name: 'Image preparation' }).textContent).toContain('CPU');
     fireEvent.click(screen.getByRole('button', { name: 'Save analysis settings' }));
     await waitFor(() => expect(command).toHaveBeenCalledWith('settingsSave', { settings: expect.objectContaining({ executionProvider: 'cpu', preprocessingBackend: 'cpu' }) }));
-    view.rerender(<VisionPage mode="live" state={state} status={{ session: { running: true } }} command={command} />);
+    view.rerender(<GameAddonPage addon={{ gameId: 'nba2k27', pluginId: 'nba2k27', title: 'NBA 2K27' }} onBack={vi.fn()} state={state} status={{ session: { running: true } }} command={command} />);
     expect((screen.getByRole('combobox', { name: 'Image preparation' }) as HTMLButtonElement).disabled).toBe(true);
   });
 
@@ -256,10 +256,10 @@ describe('vision workflows', () => {
 
   it('keeps unapplied analysis changes through native status refreshes and disallows unvalidated arming', () => {
     const command = vi.fn().mockResolvedValue(null), state = fixture();
-    const view = render(<VisionPage mode="live" state={state} status={null} command={command} />);
+    const view = render(<GameAddonPage addon={{ gameId: 'nba2k27', pluginId: 'nba2k27', title: 'NBA 2K27' }} onBack={vi.fn()} state={state} status={null} command={command} />);
     fireEvent.click(screen.getByText('Analysis settings & measured calibration'));
     fireEvent.change(screen.getByRole('spinbutton', { name: 'Estimated stream delay (ms)' }), { target: { value: '120' } });
-    view.rerender(<VisionPage mode="live" state={{ ...state, settings: { ...state.settings } }} status={{ session: { running: true, canArm: false }, output: { armed: false }, performance: { totalDecisions: 23 } }} command={command} />);
+    view.rerender(<GameAddonPage addon={{ gameId: 'nba2k27', pluginId: 'nba2k27', title: 'NBA 2K27' }} onBack={vi.fn()} state={{ ...state, settings: { ...state.settings } }} status={{ session: { running: true, canArm: false }, output: { armed: false }, performance: { totalDecisions: 23 } }} command={command} />);
     expect((screen.getByRole('spinbutton', { name: 'Estimated stream delay (ms)' }) as HTMLInputElement).value).toBe('120');
     expect((screen.getByRole('checkbox', { name: /Automatic release/ }) as HTMLInputElement).disabled).toBe(true);
     expect(command).not.toHaveBeenCalled();

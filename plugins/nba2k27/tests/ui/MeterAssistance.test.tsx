@@ -66,6 +66,7 @@ describe('meter calibration workflow', () => {
     const command = vi.fn().mockResolvedValue(null), state = fixture();
     const view = render(<Workspace mode="live" state={state} status={state.status} command={command} />);
     expect(command).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText('Diagnostic recording'));
     fireEvent.click(screen.getByRole('button', { name: 'Record diagnostics' }));
     await waitFor(() => expect(command).toHaveBeenCalledWith('diagnosticStart', undefined));
     expect(command.mock.calls.map(([action]) => action)).toEqual(['diagnosticStart']);
@@ -230,6 +231,7 @@ describe('meter calibration workflow', () => {
     expect(screen.getByText('Observation only — assistance off')).toBeTruthy();
     expect(screen.queryByText('Live forecast')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Start practice trial' })).toBeNull();
+    fireEvent.click(screen.getByText('Diagnostic recording'));
     expect(screen.getByRole('button', { name: 'Record diagnostics' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Record assisted trial' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Record assisted shots' })).toBeNull();
@@ -239,6 +241,7 @@ describe('meter calibration workflow', () => {
   it('starts diagnostic recording independently without arming controller output, then pauses a started trial after its new completed receipt', async () => {
     const command = vi.fn().mockResolvedValue(null), state = fixture();
     const view = render(<Workspace mode="live" state={state} status={state.status} command={command} />);
+    fireEvent.click(screen.getByText('Diagnostic recording'));
     fireEvent.click(screen.getByRole('button', { name: 'Record diagnostics' }));
     await waitFor(() => expect(command).toHaveBeenCalledWith('diagnosticStart', undefined));
     expect(command.mock.calls.map(([action]) => action)).toEqual(['diagnosticStart']);
@@ -262,6 +265,7 @@ describe('meter calibration workflow', () => {
     const view = render(<Workspace mode="live" state={state} status={state.status} command={command} />);
     fireEvent.click(screen.getByRole('button', { name: 'Start assistance' }));
     await waitFor(() => expect(command).toHaveBeenCalledWith('armedSet', { armed: true }));
+    fireEvent.click(screen.getByText('Diagnostic recording'));
     fireEvent.click(screen.getByRole('button', { name: 'Record diagnostics' }));
     await waitFor(() => expect(command).toHaveBeenCalledWith('diagnosticStart', undefined));
     view.rerender(<Workspace mode="live" state={state} status={{ ...state.status, output: { armed: true },
@@ -347,5 +351,45 @@ describe('meter calibration workflow', () => {
     view.rerender(<Workspace mode="live" state={fixture({ settings: { shootButton: 'x', pluginAssistance: { enabled: true, calibrationTrial: true, gameBuild: '2.0.0.12', trigger: 'largeLeft' }, trainingCapture: {} } })}
       status={{ ...state.status, output: { armed: true } }} command={command} />);
     expect(screen.getByText(/Hold P3 · Large left paddle down through the automatic reversal/)).toBeTruthy();
+  });
+
+  it('duplicates a calibrated shot profile from Profile presets while preview is running and re-arms', async () => {
+    const p2 = { id: 'shot-copy', name: 'Stretch Big copy', cameraView: '2K', meterReleaseType: 'Push', usesShotMeter: true };
+    const command = vi.fn((action: string) => action === 'profileDuplicate' ? Promise.resolve(p2) : Promise.resolve(null));
+    const state = fixture({
+      assistance: { key: 'current-setup', accepted: true, successfulTrials: 3, currentResults: [] },
+      settings: { correctionMs: -15, shootButton: 'x', pluginAssistance: { enabled: true, confirmed: true, calibrationTrial: false, gameBuild: '2.0.0.12' }, trainingCapture: {} }
+    });
+    const view = render(<Workspace mode="live" state={state} status={{ ...state.status, output: { armed: true } }} command={command} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Duplicate' }));
+    const nameInput = screen.getByLabelText('New profile name') as HTMLInputElement;
+    expect(nameInput.value).toBe('Stretch Big copy');
+    fireEvent.click(screen.getByRole('button', { name: 'Save copy' }));
+    await waitFor(() => expect(command).toHaveBeenCalledWith('profileDuplicate', { id: 'shot-profile', name: 'Stretch Big copy', restart: true }));
+    expect(command.mock.calls.slice(0, 2).map(([a]) => a)).toEqual(['armedSet', 'profileDuplicate']);
+    view.rerender(<Workspace mode="live" state={{ ...state, selectedProfile: p2, profiles: [state.selectedProfile, p2] }}
+      status={{ ...state.status, output: { armed: false } }} command={command} />);
+    await waitFor(() => expect(command).toHaveBeenCalledWith('armedSet', { armed: true }));
+  });
+
+  it('switches shot profiles live without stopping capture and updates displayed timing correction', async () => {
+    const p1 = { id: 'offline', name: 'Offline', cameraView: '2K', meterReleaseType: 'Push', usesShotMeter: true };
+    const p2 = { id: 'online', name: 'Online', cameraView: '2K', meterReleaseType: 'Push', usesShotMeter: true };
+    const command = vi.fn().mockResolvedValue(null);
+    const state = fixture({
+      selectedProfile: p1, profiles: [p1, p2],
+      assistance: { key: 'current-setup', accepted: true, successfulTrials: 3, currentResults: [] },
+      settings: { correctionMs: -15, shootButton: 'x', pluginAssistance: { enabled: true, confirmed: true, calibrationTrial: false, gameBuild: '2.0.0.12' }, trainingCapture: {} }
+    });
+    const view = render(<Workspace mode="live" state={state} status={{ ...state.status, output: { armed: true } }} command={command} />);
+    await selectValue(screen.getByRole('combobox', { name: 'Shot profile' }), 'online');
+    await waitFor(() => expect(command).toHaveBeenCalledWith('profileSelect', { id: 'online', restart: true }));
+    expect(command.mock.calls.slice(0, 2).map(([a]) => a)).toEqual(['armedSet', 'profileSelect']);
+    view.rerender(<Workspace mode="live" state={{ ...state, selectedProfile: p2,
+      settings: { correctionMs: 22, shootButton: 'x', pluginAssistance: { enabled: true, confirmed: true, calibrationTrial: false, gameBuild: '2.0.0.12' }, trainingCapture: {} } }}
+      status={{ ...state.status, output: { armed: false } }} command={command} />);
+    await waitFor(() => expect(command).toHaveBeenCalledWith('armedSet', { armed: true }));
+    fireEvent.click(screen.getByText('Advanced settings'));
+    expect((screen.getByRole('spinbutton', { name: 'Timing correction · ms' }) as HTMLInputElement).value).toBe('22');
   });
 });

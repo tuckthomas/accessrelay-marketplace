@@ -50,8 +50,12 @@ export function MeterAssistance({ state = {}, status, command, captureWindow, ed
   const autoAppliedReceipt = useRef('');
   const [resultMessage, setResultMessage] = useState('');
   const [adjustmentFailed, setAdjustmentFailed] = useState(false);
+  const [copying, setCopying] = useState(false);
+  const [copyName, setCopyName] = useState('');
   const savingFeedback = useRef(false);
   const appliedAdjustment = useRef<{ correctionMs: number; strokeDurationMs: number } | null>(null);
+  const rearmProfile = useRef('');
+  const previousProfileId = useRef(profile?.id ?? '');
   const [connectionConfirmed, setConnectionConfirmed] = useState(false);
   const trial = useRef<PracticeTrial>(practiceTrial());
   const commandRef = useRef(command), lifecycle = useRef({ mounted: false, epoch: 0 });
@@ -68,16 +72,20 @@ export function MeterAssistance({ state = {}, status, command, captureWindow, ed
   }, []);
   useUnsavedChanges(dirty);
   useEffect(() => {
-    if (dirty) return;
+    const profileChanged = previousProfileId.current !== (profile?.id ?? '');
+    if (profileChanged) previousProfileId.current = profile?.id ?? '';
+    if (dirty && !profileChanged) return;
     const expected = appliedAdjustment.current;
-    if (expected && (saved.correctionMs !== expected.correctionMs || saved.pluginAssistance?.strokeDurationMs !== expected.strokeDurationMs)) return;
+    if (!profileChanged && expected && (saved.correctionMs !== expected.correctionMs || saved.pluginAssistance?.strokeDurationMs !== expected.strokeDurationMs)) return;
     appliedAdjustment.current = null;
+    if (profileChanged) setDirty(false);
     setConfig(initialConfig(saved)); setTiming(initialTiming(saved));
-  }, [saved, dirty]);
+  }, [saved, dirty, profile?.id]);
   const locked = !!session.running || !!s.stopping || (!!s.diagnosticRecording && !s.diagnosticRecording.isFinalized), working = !!busy || !!s.busy;
   const output = s.output ?? {}, calibration = state.assistance ?? {}, receipt = s.lastAction;
   const diagnostic = s.diagnosticRecording, recordingDiagnostics = !!diagnostic?.isRecording;
   const savingDiagnostics = !!diagnostic && !diagnostic.isRecording && !diagnostic.isFinalized;
+  const switchingBlocked = !!s.stopping || recordingDiagnostics || savingDiagnostics || !!s.training?.isRecording || working || dirty;
   const signature = receipt ? `${receipt.runId}:${receipt.id}` : '';
   const matching = !!receipt && receipt.configurationKey === calibration.key;
   const used = (calibration.currentResults ?? []).some((r: any) => r.receiptId === receipt?.id && r.runId === receipt?.runId);
@@ -186,6 +194,31 @@ export function MeterAssistance({ state = {}, status, command, captureWindow, ed
     } catch { await cleanupStart(operation, true); }
     finally { if (starting.current === operation) starting.current = null; }
   }
+  useEffect(() => {
+    if (!rearmProfile.current || profile?.id !== rearmProfile.current || !session.running || !session.canArm || !accepted || output.armed) return;
+    rearmProfile.current = '';
+    void begin();
+  }, [profile?.id, session.running, session.canArm, accepted, output.armed]);
+  async function switchProfile(id: string) {
+    if (!id || id === profile?.id) return;
+    const wasArmed = !!output.armed;
+    rearmProfile.current = wasArmed ? id : '';
+    try {
+      if (wasArmed) { cancelStart(); await pauseTrial(trial.current, true); }
+      await run('profileSelect', { id, restart: !!session.running });
+    } catch { rearmProfile.current = ''; }
+  }
+  async function duplicateProfile() {
+    const trimmed = copyName.trim();
+    if (!profile || !trimmed) return;
+    const wasArmed = !!output.armed;
+    try {
+      if (wasArmed) { cancelStart(); await pauseTrial(trial.current, true); }
+      const created = await run('profileDuplicate', { id: profile.id, name: trimmed, restart: !!session.running });
+      rearmProfile.current = wasArmed && created?.id ? created.id : '';
+      setCopying(false);
+    } catch { rearmProfile.current = ''; }
+  }
   async function saveFeedbackWith(chosen = feedback) {
     if (savingFeedback.current) return;
     savingFeedback.current = true;
@@ -243,42 +276,47 @@ export function MeterAssistance({ state = {}, status, command, captureWindow, ed
       disabled={working || !!output.armed} onChange={e => edit(key, e.target.value === '' ? NaN : +e.target.value)} /></Field>;
   }
   return <div className="page-stack meter-workflow"><style>{styles}</style>
-    <Card title="Shot setup"><div className="meter-profile-row">
-      <ProfilePicker label="Shot profile" value={profile?.id ?? ''} disabled={locked || working || dirty}
+    <Card title="Profile presets" description="Save separate calibrated presets for different modes or jumpshots and switch live."><div className="meter-profile-row">
+      <ProfilePicker label="Shot profile" value={profile?.id ?? ''} disabled={switchingBlocked}
         options={[{ id: '', name: 'Choose a shot profile', disabled: true }, ...(state.profiles ?? [])]}
-        onSelect={id => invoke('profileSelect', { id })} onCreate={() => editProfile()} />
+        onSelect={id => { void switchProfile(id); }} onCreate={() => editProfile()} />
       <Button disabled={!profile || locked || working || dirty} onClick={() => editProfile(profile)}><Icon name="pencil" size={16} />Edit profile</Button>
+      <Button disabled={!profile || switchingBlocked} onClick={() => { setCopyName(`${profile.name} copy`); setCopying(true); }}><Icon name="copy" size={16} />Duplicate</Button>
       <Field label="Shooting input"><Select value={config.inputMode} disabled={locked || working} onValueChange={v => edit('inputMode', v)}>
         <SelectOption value="rhythm">Rhythm · right stick</SelectOption><SelectOption value="button">Shoot button</SelectOption></Select></Field>
       {config.inputMode === 'rhythm' && <Field label="Shot trigger"><Select value={config.trigger ?? 'largeRight'} disabled={locked || working} onValueChange={v => edit('trigger', v)}>
         {Object.entries(triggerLabels).map(([value, label]) => <SelectOption key={value} value={value}>{label}</SelectOption>)}</Select></Field>}
-    </div>{profile && <p className="subtle meter-profile-summary">{profile.cameraView} camera · {profile.meterReleaseType || 'Release cue not set'} · {profile.usesShotMeter ? 'Meter on' : 'Meter off'}</p>}
+    </div>{copying && profile && <div className="meter-profile-row meter-copy-row">
+      <Field label="New profile name"><Input value={copyName} maxLength={80} autoFocus placeholder="For example, MyCourt, Rec, or Park" onChange={e => setCopyName(e.target.value)} /></Field>
+      <Button variant="primary" disabled={switchingBlocked || !copyName.trim()} busy={busy === 'profileDuplicate'} onClick={() => { void duplicateProfile(); }}>Save copy</Button>
+      <Button disabled={working} onClick={() => setCopying(false)}>Cancel</Button>
+    </div>}{profile && <p className="subtle meter-profile-summary">{profile.cameraView} camera · {profile.meterReleaseType || 'Release cue not set'} · {profile.usesShotMeter ? 'Meter on' : 'Meter off'}</p>}
     {config.inputMode === 'rhythm' && (config.trigger ?? 'largeRight') !== 'physicalStick' && <p className="subtle meter-profile-summary">Paddle trigger: map the selected paddle to its PC Profile Numpad key in Xbox Accessories so the Xbox app ignores it and Studio drives the full virtual stick stroke. Keep the physical right stick centered.</p>}</Card>
     <div className="meter-layout">
       <div className="meter-capture"><GameplayPreview status={s} window={captureWindow} onError={setError} actions={locked
         ? <Button active={!!session.running} disabled={!!s.stopping} onClick={() => void stopPreview()}>Stop preview</Button>
         : <Button active={false} disabled={working || !profile?.usesShotMeter || !source} busy={busy === 'start'} onClick={() => void preview()}>Start preview</Button>} />
-        <Card title="Diagnostic recording" description="Save gameplay frames and detection telemetry for up to 15 seconds.">
-          <p className="subtle">{output.armed
-            ? accepted
-              ? 'Automatic reversal is on. Recording captures your live assisted shots.'
-              : 'Automatic reversal is on for one practice shot. Recording captures your shot; assistance still pauses after it finishes.'
-            : 'Automatic reversal is off. Recording captures observations only — start assistance or a practice trial first to record with assistance on.'}</p>
-          <div className="button-group"><Button active={recordingDiagnostics} disabled={savingDiagnostics || (!recordingDiagnostics && (working || !session.running || !!s.stopping || !!s.training?.isRecording))}
-            busy={busy === 'diagnosticStart'} onClick={() => invoke(recordingDiagnostics ? 'diagnosticStop' : 'diagnosticStart')}>
-            {recordingDiagnostics ? 'Stop diagnostic recording' : 'Record diagnostics'}</Button>
-            {diagnostic?.isFinalized && <Button disabled={working} onClick={() => invoke('openDiagnosticFolder')}>Open diagnostic folder</Button>}
-          </div>
-          {diagnostic && <div role="status" aria-live="polite"><p>{diagnostic.message}</p>
-            <p className="subtle">{diagnostic.observedFrames ?? 0} frames analyzed · {diagnostic.storedFrames ?? 0} images saved · {diagnostic.droppedFrames ?? 0} images skipped</p></div>}
-          {diagnostic?.failed && <Notice tone="danger">The diagnostic recording could not finish. Open its folder to inspect any saved evidence.</Notice>}
-        </Card>
         <details className="meter-diagnostics"><summary>Detection details</summary><p role="status">{signal.message || 'Detection runs when you hold the shooting input.'}</p>
           <div className="meter-readings">{[['Fill', `${fmt(signal.progress * 100)}%`], ['Predicted target', `${fmt(signal.timeToTargetMs)} ms`],
             ['Fill velocity', signal.continueCommittedAction ? '—' : `${fmt(signal.velocityPerMs * 1000 * 100)}% / s`], ['Samples', signal.samples ?? 0],
             ['Action phase', signal.continueCommittedAction ? output.armed ? 'Finishing anchored stroke' : 'Observation only — assistance off'
               : signal.invalidateAttempt ? 'Attempt cancelled' : signal.timeToTargetMs != null ? output.armed ? 'Live forecast' : 'Observation only — assistance off' : 'Observing'],
             ['Uncertainty', signal.continueCommittedAction ? '—' : `${fmt(signal.uncertaintyMs)} ms`], ['Processing', `${fmt(signal.processingMs, 2)} ms`], ['Geometry score', fmt(signal.confidence, 2)]].map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}</div></details>
+        <details className="meter-diagnostics"><summary>Diagnostic recording</summary><div className="stack" style={{ marginTop: '12px' }}>
+          <p className="subtle" style={{ margin: 0 }}>Save gameplay frames and detection telemetry for up to 15 seconds. {output.armed
+            ? accepted
+              ? 'Automatic reversal is on; recording captures your live assisted shots.'
+              : 'Automatic reversal is on for one practice shot.'
+            : 'Automatic reversal is off; recording captures observations only.'}</p>
+          <div className="button-group"><Button active={recordingDiagnostics} disabled={savingDiagnostics || (!recordingDiagnostics && (working || !session.running || !!s.stopping || !!s.training?.isRecording))}
+            busy={busy === 'diagnosticStart'} onClick={() => invoke(recordingDiagnostics ? 'diagnosticStop' : 'diagnosticStart')}>
+            {recordingDiagnostics ? 'Stop diagnostic recording' : 'Record diagnostics'}</Button>
+            {diagnostic?.isFinalized && <Button disabled={working} onClick={() => invoke('openDiagnosticFolder')}>Open diagnostic folder</Button>}
+          </div>
+          {diagnostic && <div role="status" aria-live="polite"><p style={{ margin: 0 }}>{diagnostic.message}</p>
+            <p className="subtle" style={{ margin: 0 }}>{diagnostic.observedFrames ?? 0} frames analyzed · {diagnostic.storedFrames ?? 0} images saved · {diagnostic.droppedFrames ?? 0} images skipped</p></div>}
+          {diagnostic?.failed && <Notice tone="danger">The diagnostic recording could not finish. Open its folder to inspect any saved evidence.</Notice>}
+        </div></details>
       </div>
       <Card title={accepted ? 'Meter assistance' : 'Calibrate your shot'} className="meter-practice">
         <div className="meter-readiness" aria-label="Connection readiness">
@@ -357,7 +395,7 @@ export function MeterAssistance({ state = {}, status, command, captureWindow, ed
 }
 
 const styles = `
-.meter-profile-row{display:flex;align-items:end;gap:16px;flex-wrap:wrap}.meter-profile-row>.field,.meter-profile-row>.profile-picker{flex:1;min-width:220px}.meter-profile-summary{margin:16px 0 0}
+.meter-profile-row{display:flex;align-items:end;gap:16px;flex-wrap:wrap}.meter-profile-row>.field,.meter-profile-row>.profile-picker{flex:1;min-width:220px}.meter-copy-row{margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}.meter-profile-summary{margin:16px 0 0}
 .meter-layout{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(340px,.85fr);gap:20px;align-items:start}.meter-layout>*{min-width:0}.meter-capture{display:grid;gap:16px}
 .meter-readiness{display:grid;margin-bottom:16px}.meter-readiness>div{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:52px;padding:10px 0;border-bottom:1px solid var(--line)}
 .meter-connected{display:flex;align-items:center;gap:6px;color:var(--success)}.meter-primary{width:100%;margin:4px 0 12px}.meter-progress{display:flex;align-items:baseline;gap:10px;padding:16px 0;border-bottom:1px solid var(--line)}

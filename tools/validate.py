@@ -18,6 +18,11 @@ for item in catalog['entries']:
     assert item['manifestPath'] == f"packages/{item['id']}/{item['version']}/pack.json"
     path = root / item['manifestPath']
     assert hashlib.sha256(path.read_bytes()).hexdigest() == item['manifestSha256']
+    if item.get('coverPath'):
+        assert item['coverPath'].startswith(f"packages/{item['id']}/{item['version']}/data/")
+        cover_file = root / item['coverPath']
+        assert cover_file.suffix.lower() in ('.jpg', '.jpeg', '.png', '.webp')
+        assert hashlib.sha256(cover_file.read_bytes()).hexdigest() == item['coverSha256']
     manifest = json.loads(path.read_text(encoding='utf-8'))
     assert manifest['schemaVersion'] == manifest['apiVersion'] and manifest['schemaVersion'] in (1, 2)
     assert item.get('nativeCode', False) == ('runtime' in manifest)
@@ -30,7 +35,7 @@ for item in catalog['entries']:
     assert len(manifest['assets']) <= 40
     if 'controllerTrainer' in manifest:
         trainer = manifest['controllerTrainer']
-        assert manifest.get('gameId') and manifest.get('trainingAdapter', 'none') == 'none'
+        assert manifest.get('gameId')
         assert 1 <= len(trainer['shots']) <= 8
         assert len({shot['id'] for shot in trainer['shots']}) == len(trainer['shots'])
         for group in ('timingFeedback', 'tempoFeedback'):
@@ -38,7 +43,7 @@ for item in catalog['entries']:
             assert 1 <= len(choices) <= 16 and len({choice['id'] for choice in choices}) == len(choices)
             assert all(isinstance(choice['adjustmentMs'], int) and abs(choice['adjustmentMs']) <= 100 for choice in choices)
             assert any(choice['id'] == 'none' and choice['adjustmentMs'] == 0 for choice in choices)
-        assert path.read_bytes() == (root / 'plugins/controller-trainer/pack.json').read_bytes()
+        assert trainer == json.loads((root / 'plugins/nba2k27/controller-trainer.json').read_text(encoding='utf-8'))
     for asset in manifest['assets']:
         parts = Path(asset['path']).parts
         assert not Path(asset['path']).is_absolute() and '..' not in parts and ':' not in asset['path']

@@ -1,4 +1,4 @@
-import { React, useEffect, useRef, useState, ProfilePicker, GameplayPreview, Select, SelectOption, Input, Slider, Checkbox, Badge, Button, Card, DiscardDialog, EmptyState, Field, Icon, Modal, Notice, Tabs, Toggle, hasUnsavedChanges, useUnsavedChanges, type VisionWorkspaceProps } from './host.js';
+import { React, useEffect, useRef, useState, ProfilePicker, GameplayPreview, ControllerTrainer, Select, SelectOption, Input, Slider, Checkbox, Badge, Button, Card, DiscardDialog, EmptyState, Field, Icon, Modal, Notice, Tabs, Toggle, hasUnsavedChanges, useUnsavedChanges, type VisionWorkspaceProps } from './host.js';
 import type { PointerEvent as Pointer } from 'react';
 import { MeterAssistance, meterArguments, meterDefaults } from './MeterAssistance.js';
 
@@ -23,24 +23,76 @@ export function Nba2K27VisionWorkspace(props: VisionWorkspaceProps) {
   const s = props.status ?? props.state?.status ?? {};
   async function switchMethod(next: string) {
     if (next === method) return;
-    setError(''); setBusy(true);
-    try { if (props.state?.selectedProfile) await props.command('signalConfigure', meterArguments({ ...meterDefaults,
-      ...props.state?.settings?.pluginAssistance, enabled: next === 'meter' }, props.state?.settings ?? {})); setMethod(next); }
-    catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); }
+    setError('');
+    if (next === 'meter' || next === 'animation') {
+      setBusy(true);
+      try {
+        if (props.state?.selectedProfile) await props.command('signalConfigure', meterArguments({ ...meterDefaults,
+          ...props.state?.settings?.pluginAssistance, enabled: next === 'meter' }, props.state?.settings ?? {}));
+        setMethod(next);
+      }
+      catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); }
+    } else {
+      setMethod(next);
+    }
   }
   // Training owns clip recording and review regardless of the selected Live
   // assistance method. Opening training must never configure or arm output.
   if (props.mode === 'training') return <AnimationWorkspace {...props} />;
   return <div className="page-stack"><style>{styles}</style>
-    <Field label="Assistance method"><Select value={method} disabled={busy || !!s.session?.running || !!s.stopping} onValueChange={next => { if (hasUnsavedChanges()) setPendingMethod(next); else void switchMethod(next); }}>
-      <SelectOption value="meter">Shot meter · direct detection</SelectOption><SelectOption value="animation">Animation model · meter off</SelectOption></Select></Field>
+    <Tabs value={method} onChange={next => {
+      if (next === method || busy || !!s.session?.running || !!s.stopping) return;
+      if (hasUnsavedChanges()) setPendingMethod(next); else void switchMethod(next);
+    }} ariaLabel="NBA 2K27 tools" items={[
+      { id: 'meter', label: 'Shot meter' },
+      { id: 'animation', label: 'Animation model' },
+      { id: 'trainer', label: 'Lua shot trainer' },
+    ]} />
     {error && <Notice tone="danger">{error}</Notice>}
-    {method === 'meter' ? <MeterAssistance {...props} editProfile={profile => setEditor(profile ? { ...profile } : fresh())} /> : <AnimationWorkspace {...props} />}
+    {method === 'meter'
+      ? <MeterAssistance {...props} editProfile={profile => setEditor(profile ? { ...profile } : fresh())} />
+      : method === 'animation'
+        ? <AnimationWorkspace {...props} />
+        : <NbaLuaShotTrainer controller={props.controller} />}
     <DiscardDialog open={pendingMethod !== null} onKeep={() => setPendingMethod(null)} onDiscard={() => { const next = pendingMethod; setPendingMethod(null); if (next) void switchMethod(next); }} />
     {editor && <ProfileEditor key={editor.id} profile={editor} isSaved={(props.state?.profiles ?? []).some((p: any) => p.id === editor.id)}
       fingerprint={editor.id === props.state?.selectedProfile?.id ? props.state?.selectedFingerprint : ''} busy={busy} error={error} close={() => setEditor(null)}
       run={async (action, args, done) => { setBusy(true); setError(''); try { const result = await props.command(action, args); done?.(result); return result; }
         catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); } }} />}
+  </div>;
+}
+
+function NbaLuaShotTrainer({ controller }: { controller?: VisionWorkspaceProps['controller'] }) {
+  const [busy, setBusy] = useState(false), [error, setError] = useState(''), [message, setMessage] = useState('');
+  if (!controller || !ControllerTrainer) {
+    return <Card title="Lua shot trainer"><p className="subtle">Controller scripting integration is unavailable in this host.</p></Card>;
+  }
+  const packs: any[] = controller.state?.trainerPacks || controller.state?.gamePacks || [];
+  const pack = packs.find(item => item.manifest?.controllerTrainer && (item.manifest?.gameId === 'nba2k27' || item.manifest?.id === 'nba2k27'));
+  if (!pack) {
+    return <Card title="Lua shot trainer"><p className="subtle">Reinstall or refresh the NBA 2K27 add-on to enable the Lua shot trainer.</p></Card>;
+  }
+  const profile = controller.state?.activeProfile;
+  const current = profile?.gamePack;
+  const matches = current?.id === pack.manifest.id && current?.version === pack.manifest.version && current?.manifestSha256 === pack.manifestSha256;
+  const setup = async () => {
+    setBusy(true); setError(''); setMessage('');
+    try {
+      const result = await controller.command('packCreateSetup', { key: pack.key, values: {} });
+      setMessage(result?.message || 'NBA 2K27 controller profile created. Select a shot below to record your baseline.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally { setBusy(false); }
+  };
+  return <div className="page-stack">
+    {error && <Notice tone="danger">{error}</Notice>}
+    {message && <Notice tone="success">{message}</Notice>}
+    {!matches ? <Card title="Lua shot trainer" description="Record Standing Still, Off-Dribble, and Fade-Away physical baselines into standalone Lua scripts and tune timing/tempo from feedback.">
+      <div className="stack">
+        <p className="subtle">Active controller profile: <strong>{profile?.name || 'None'}</strong>. Creating a trainer profile keeps your existing controller profiles intact and lets you switch cleanly between Lua baseline playback and other setups.</p>
+        <Button variant="primary" busy={busy} onClick={() => void setup()}>Create NBA 2K27 trainer profile</Button>
+      </div>
+    </Card> : <ControllerTrainer key={pack.key + ':' + profile.id} state={controller.state} status={controller.status} command={controller.command} pack={pack} />}
   </div>;
 }
 

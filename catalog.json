@@ -2,41 +2,26 @@
   "schemaVersion": 1,
   "entries": [
     {
-      "id": "nba2k27-training",
-      "name": "NBA 2K27 Assistance & Training",
-      "description": "Curved-meter assistance with RHYTHM/TIMING feedback, calibration without a separate tempo grade, bounded timing adjustments and recorded assisted trials. Requires Studio beta.38 or newer.",
+      "id": "nba2k27",
+      "name": "NBA 2K27",
+      "description": "Unified NBA 2K27 add-on: live curved-meter assistance with RHYTHM/TIMING feedback, auto-OCR timing, animation model training, and Lua shot trainer.",
       "author": "AccessRelay",
-      "version": "1.2.17",
+      "version": "2.1.0",
       "kind": "training-plugin",
       "gameId": "nba2k27",
       "license": "0BSD; capture models Apache-2.0",
-      "manifestPath": "packages/nba2k27-training/1.2.17/pack.json",
-      "manifestSha256": "7b61203229096e066d0fff13d4ab480fbcd5364f408b5ae53ef5f878006d9841",
+      "manifestPath": "packages/nba2k27/2.1.0/pack.json",
+      "manifestSha256": "c88a898f7aeda10ee6626c8ec4a26e1794d5b8ad6db622990d002992d7d5ac57",
       "tags": [
         "nba2k27",
+        "vision",
         "training",
-        "vision"
+        "shot-trainer",
+        "lua"
       ],
-      "nativeCode": true
-    },
-    {
-      "id": "nba2k27",
-      "name": "NBA 2K27 Shot Trainer",
-      "description": "Standing Still, Off-Dribble and Fade-Away shot baselines with isolated shot-input Lua playback. Tap once to play the whole shot; live movement stays manual. Timing and tempo edits retain Run scripts. Requires Studio beta.42 or newer.",
-      "author": "AccessRelay",
-      "version": "2.0.1",
-      "kind": "controller-profile",
-      "license": "0BSD",
-      "manifestPath": "packages/nba2k27/2.0.1/pack.json",
-      "manifestSha256": "316aaed675db4821dfdd9bc010b7aa89b39ec722c83e0012f636e2bb985d2de7",
-      "tags": [
-        "nba2k27",
-        "controller",
-        "baseline",
-        "lua",
-        "shot-trainer"
-      ],
-      "gameId": "nba2k27"
+      "nativeCode": true,
+      "coverPath": "packages/nba2k27/2.1.0/data/cover.jpg",
+      "coverSha256": "f0fc7d29e1acd004a1e15079b9470229cc2c24d521da35d39ec00d5e04f525de"
     }
   ]
 }

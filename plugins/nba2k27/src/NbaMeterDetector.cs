@@ -104,27 +104,43 @@ internal sealed class NbaMeterDetector(NbaMeterSettings settings) : INbaMeterDet
             caps.Add(new(left+sumX/tail*step,top+sumY/tail*step,Math.Sqrt(w*w+h*h),tail));
         }
         Measurement? best=null;double second=0;
-        foreach(var cap in caps.OrderByDescending(c=>c.Area).Take(40))
+        bool hasReliablePrior = _previous is { } priorState && (priorState.Progress > .03 || priorState.Score >= .78);
+        foreach(var cap in caps.OrderByDescending(c=>c.Area).Take(24))
         {
             Measurement? candidate=null;
-            double baseWidth = _previous is { } priorCap && Math.Abs(cap.X - priorCap.TargetX) < width * .08 && Math.Abs(cap.Y - priorCap.TargetY) < height * .08
+            double baseWidth = hasReliablePrior && _previous is { } priorCap && Math.Abs(cap.X - priorCap.TargetX) < width * .08 && Math.Abs(cap.Y - priorCap.TargetY) < height * .08
                 ? Math.Max(cap.Width, priorCap.Thickness * .85) : cap.Width;
-            for(double ratio=7;ratio<=14;ratio+=.5)for(int side=-1;side<=1;side+=2)for(double bow=.16;bow<=.281;bow+=.04)for(double end=-.24;end<=.081;end+=.08)
+            double bestCoarse = double.NegativeInfinity, bestR = 10.5, bestBow = .22, bestEnd = -.04; int bestSide = 1;
+            for(double ratio=7.5;ratio<=13.6;ratio+=1.5)for(int side=-1;side<=1;side+=2)for(double bow=.18;bow<=.261;bow+=.08)for(double end=-.20;end<=.081;end+=.14)
             {
                 double h=baseWidth*ratio;if(h<height*.035||h>height*.38||cap.Y+h>=height)continue;
                 double score=Score(pixels,width,height,stride,cap.X,cap.Y,h,side*bow*h,side*end*h,baseWidth);
-                if(_previous is { } prior) score-=Math.Min(.18,Math.Abs(h/prior.Height-1)*.35);
-                if(candidate is null||score>candidate.Value.Score)
+                if(hasReliablePrior && _previous is { } prior) score-=Math.Min(.18,Math.Abs(h/prior.Height-1)*.35);
+                if(score>bestCoarse){bestCoarse=score;bestR=ratio;bestSide=side;bestBow=bow;bestEnd=end;}
+            }
+            bool nearPrevious = hasReliablePrior && _previous is { } trackedCap && Math.Abs(cap.X-trackedCap.TargetX)<width*.04 && Math.Abs(cap.Y-trackedCap.TargetY)<height*.04;
+            if(bestCoarse >= .38 || nearPrevious)
+            {
+                double rMin=Math.Max(7,bestR-1), rMax=Math.Min(14,bestR+1);
+                double bMin=Math.Max(.16,bestBow-.04), bMax=Math.Min(.28,bestBow+.04);
+                double eMin=Math.Max(-.24,bestEnd-.08), eMax=Math.Min(.08,bestEnd+.08);
+                for(double ratio=rMin;ratio<=rMax+.01;ratio+=.5)for(double bow=bMin;bow<=bMax+.005;bow+=.04)for(double end=eMin;end<=eMax+.005;end+=.08)
                 {
-                    double l=Math.Max(0,cap.X+Math.Min(0,side*(bow+end)*h)-baseWidth-Math.Abs(end*h)),r=Math.Min(width,cap.X+Math.Max(0,side*(bow+end)*h)+baseWidth+Math.Abs(end*h));
-                    double topY=Math.Max(0,cap.Y-baseWidth),bottom=Math.Min(height,cap.Y+h+baseWidth);
-                    var bounds=new VisionCrop(l/width,topY/height,(r-l)/width,(bottom-topY)/height);
-                    candidate=new(bounds,0,score,h,cap.X,cap.Y,side*bow*h,side*end*h,baseWidth);
+                    double h=baseWidth*ratio;if(h<height*.035||h>height*.38||cap.Y+h>=height)continue;
+                    double score=Score(pixels,width,height,stride,cap.X,cap.Y,h,bestSide*bow*h,bestSide*end*h,baseWidth);
+                    if(hasReliablePrior && _previous is { } prior) score-=Math.Min(.18,Math.Abs(h/prior.Height-1)*.35);
+                    if(candidate is null||score>candidate.Value.Score)
+                    {
+                        double l=Math.Max(0,cap.X+Math.Min(0,bestSide*(bow+end)*h)-baseWidth-Math.Abs(end*h)),r=Math.Min(width,cap.X+Math.Max(0,bestSide*(bow+end)*h)+baseWidth+Math.Abs(end*h));
+                        double topY=Math.Max(0,cap.Y-baseWidth),bottom=Math.Min(height,cap.Y+h+baseWidth);
+                        var bounds=new VisionCrop(l/width,topY/height,(r-l)/width,(bottom-topY)/height);
+                        candidate=new(bounds,0,score,h,cap.X,cap.Y,bestSide*bow*h,bestSide*end*h,baseWidth);
+                    }
                 }
             }
             // Validate the previous full ribbon against this frame. A fragmented cap
             // must not force a shorter meter when the original ribbon is still visible.
-            if (_previous is { } tracked && Math.Abs(cap.X-tracked.TargetX)<width*.04 && Math.Abs(cap.Y-tracked.TargetY)<height*.04)
+            if (hasReliablePrior && _previous is { } tracked && Math.Abs(cap.X-tracked.TargetX)<width*.04 && Math.Abs(cap.Y-tracked.TargetY)<height*.04)
             {
                 double score=Score(pixels,width,height,stride,cap.X,cap.Y,tracked.Height,tracked.Bow,tracked.End,tracked.Thickness);
                 if(score>=.55 && (candidate is null || score>=candidate.Value.Score-.015))
@@ -141,7 +157,7 @@ internal sealed class NbaMeterDetector(NbaMeterSettings settings) : INbaMeterDet
         }
         if(best is { } found && second>found.Score-.06){Ambiguous=true;return null;}
         if(best is not { } selected)return null;
-        if(_previous is { } previous && Math.Abs(selected.TargetX-previous.TargetX)<width*.08 && Math.Abs(selected.TargetY-previous.TargetY)<height*.08
+        if(hasReliablePrior && _previous is { } previous && Math.Abs(selected.TargetX-previous.TargetX)<width*.08 && Math.Abs(selected.TargetY-previous.TargetY)<height*.08
             && selected.Height/previous.Height is > .75 and < 1.25)
         {
             // A one-pixel cap-edge change must not rescale the entire meter on every frame.
