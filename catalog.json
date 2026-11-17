@@ -6,12 +6,12 @@
       "name": "NBA 2K27",
       "description": "Unified NBA 2K27 add-on: live curved-meter assistance with RHYTHM/TIMING feedback, auto-OCR timing, animation model training, and Lua shot trainer.",
       "author": "AccessRelay",
-      "version": "2.1.3",
+      "version": "2.1.4",
       "kind": "training-plugin",
       "gameId": "nba2k27",
       "license": "0BSD; capture models Apache-2.0",
-      "manifestPath": "packages/nba2k27/2.1.3/pack.json",
-      "manifestSha256": "b8bbe4b17393a35664c487534dce2fc016cceacd7a260db815527521aa112a70",
+      "manifestPath": "packages/nba2k27/2.1.4/pack.json",
+      "manifestSha256": "9daa94bcb1165ced9c7936b5544d46dbeace07f75e3f39efc107792a67fc17f7",
       "tags": [
         "nba2k27",
         "vision",
@@ -20,7 +20,7 @@
         "lua"
       ],
       "nativeCode": true,
-      "coverPath": "packages/nba2k27/2.1.3/data/cover.jpg",
+      "coverPath": "packages/nba2k27/2.1.4/data/cover.jpg",
       "coverSha256": "f0fc7d29e1acd004a1e15079b9470229cc2c24d521da35d39ec00d5e04f525de"
     }
   ]

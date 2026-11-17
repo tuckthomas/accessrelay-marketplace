@@ -157,6 +157,21 @@ internal sealed class NbaMeterDetector(NbaMeterSettings settings) : INbaMeterDet
         }
         if(best is { } found && second>found.Score-.06){Ambiguous=true;return null;}
         if(best is not { } selected)return null;
+        double refinedH=RefineHeight(pixels,width,height,stride,selected);
+        if(Math.Abs(refinedH-selected.Height)>1.5)
+        {
+            double s=refinedH/selected.Height,refinedBow=selected.Bow*s*s,refinedEnd=4*selected.Bow*s*(1-s)+selected.End*s;
+            double refinedScore=Score(pixels,width,height,stride,selected.TargetX,selected.TargetY,refinedH,refinedBow,refinedEnd,selected.Thickness);
+            if(refinedScore>=.55)
+            {
+                double l=Math.Max(0,selected.TargetX+Math.Min(0,refinedBow+refinedEnd)-selected.Thickness-Math.Abs(refinedEnd));
+                double t=Math.Max(0,selected.TargetY-selected.Thickness);
+                double r=Math.Min(width,selected.TargetX+Math.Max(0,refinedBow+refinedEnd)+selected.Thickness+Math.Abs(refinedEnd));
+                double b=Math.Min(height,selected.TargetY+refinedH+selected.Thickness);
+                selected=selected with { Height=refinedH,Bow=refinedBow,End=refinedEnd,Score=refinedScore,
+                    Bounds=new(l/width,t/height,Math.Max(0,(r-l)/width),Math.Max(0,(b-t)/height)) };
+            }
+        }
         if(hasReliablePrior && _previous is { } previous && Math.Abs(selected.TargetX-previous.TargetX)<width*.08 && Math.Abs(selected.TargetY-previous.TargetY)<height*.08
             && selected.Height/previous.Height is > .75 and < 1.25)
         {
@@ -262,6 +277,59 @@ internal sealed class NbaMeterDetector(NbaMeterSettings settings) : INbaMeterDet
             if(tail>bestArea){bestArea=tail;progress=Math.Clamp((meter.TargetY+meter.Height-(top+minY))/(meter.Height*.9),0,1);}
         }
         return progress;
+    }
+    private static double RefineHeight(ReadOnlySpan<byte> p,int width,int height,int stride,Measurement m)
+    {
+        double minDh=Math.Max(m.Thickness*4.5,m.Height*.50),maxDh=Math.Min(height-m.TargetY-2,m.Height*1.38);
+        double startDh=Math.Clamp(m.Thickness*4.0,m.Thickness*2.0,minDh),step=2.0,tStart=startDh/m.Height;
+        double cx=m.TargetX+m.Bow*4*tStart*(1-tStart)+m.End*tStart,lastValidDh=m.Height;
+        int gapCount=0,fillGapCount=0,maxGap=Math.Max(3,(int)Math.Ceiling(m.Thickness*.35/step));
+        double refLuma=0,peakFillLuma=0;int refN=0;bool sawBrightFill=false;
+        for(double t=.22;t<=.52;t+=.05)
+        {
+            double rx=m.TargetX+m.Bow*4*t*(1-t)+m.End*t;
+            var rp=Pixel(p,width,height,stride,rx,m.TargetY+m.Height*t);
+            if(rp.Chroma<35 && rp.Luma>65){refLuma+=rp.Luma;refN++;}
+        }
+        if(refN>0)refLuma/=refN;
+        double minInteriorLuma=Math.Max(65,Math.Min(110,refLuma*.72));
+        for(double dh=startDh;dh<=maxDh;dh+=step)
+        {
+            double t=dh/m.Height,slope=t<=1?(m.Bow*4*(1-2*t)+m.End)/m.Height:(m.End-4*m.Bow)/m.Height;
+            cx+=slope*step;
+            double cy=m.TargetY+dh,sumX=0,bestRowLuma=0,bestFillLuma=0;int insideCount=0,fillCount=0,halfW=Math.Max(2,(int)Math.Round(m.Thickness*.42));
+            for(int dx=-halfW;dx<=halfW;dx++)
+            {
+                var px=Pixel(p,width,height,stride,cx+dx,cy);
+                if(px.Chroma<35 && px.Luma>=minInteriorLuma){insideCount++;sumX+=cx+dx;if(px.Luma>bestRowLuma)bestRowLuma=px.Luma;}
+                if(px.Chroma<25 && px.Luma>=155){fillCount++;if(px.Luma>bestFillLuma)bestFillLuma=px.Luma;}
+            }
+            if(fillCount>=2){sawBrightFill=true;peakFillLuma=Math.Max(peakFillLuma,bestFillLuma);}
+            bool rawInterior=insideCount>=Math.Max(2,halfW/2),hasContrast=false;
+            if(rawInterior)
+            {
+                double nx=1/Math.Sqrt(1+slope*slope),ny=-slope*nx,midX=sumX/insideCount;
+                var outA=Pixel(p,width,height,stride,midX-nx*m.Thickness*.65,cy-ny*m.Thickness*.65);
+                var outB=Pixel(p,width,height,stride,midX+nx*m.Thickness*.65,cy+ny*m.Thickness*.65);
+                double sepA=Math.Max(Math.Abs(bestRowLuma-outA.Luma),(outA.Chroma-20)*.7);
+                double sepB=Math.Max(Math.Abs(bestRowLuma-outB.Luma),(outB.Chroma-20)*.7);
+                // Keep tracking through court lines crossing one edge; stop only when both flanks lose contrast.
+                hasContrast=dh<minDh || !(Math.Max(sepA,sepB)<18 || (bestRowLuma<160 && Math.Min(sepA,sepB)<8));
+                if(hasContrast)cx=cx*.4+midX*.6;
+            }
+            // The bright white fill runs continuously to the bottom border; a drop past it means we exited the meter.
+            if(sawBrightFill && dh>=minDh)
+            {
+                bool rowHasFill=fillCount>=2 && bestFillLuma>=Math.Max(148,peakFillLuma-34);
+                if(rowHasFill){lastValidDh=dh;fillGapCount=0;}
+                else if(++fillGapCount>=2)break;
+                continue;
+            }
+            if(rawInterior && hasContrast){if(dh>=minDh)lastValidDh=dh;gapCount=0;}
+            // Keep scanning while meter-width pixels continue through a crossing court stripe; stop only once pixels exit the meter.
+            else if(!rawInterior && dh>=minDh && ++gapCount>=maxGap)break;
+        }
+        return lastValidDh;
     }
     private static (double Luma,int Chroma) Pixel(ReadOnlySpan<byte> p,int width,int height,int stride,double x,double y)
     {
