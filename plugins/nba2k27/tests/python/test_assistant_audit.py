@@ -18,7 +18,10 @@ class AssistantAuditTests(unittest.TestCase):
     def setUp(self):
         self.fixture = fixtures.DatasetValidationTests()
         self.fixture.setUp()
-        self.fixture.load([self.fixture.target, self.fixture.negative])
+        # The production audit requests four frames spaced at least 16.67 ms apart.
+        # The short, two-frame intervals used by label-validation tests cannot supply this history.
+        self.fixture.target.update(endTicks=210000, targetReleaseTicks=200000)
+        self.fixture.load([self.fixture.target])
 
     def tearDown(self):
         self.fixture.tearDown()
