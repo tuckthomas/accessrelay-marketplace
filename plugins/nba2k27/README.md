@@ -1,5 +1,30 @@
 # NBA 2K27 implementation
 
+Development version 2.2.0-beta.1 requires Studio runtime contract 4 (the paired
+`fix/auto-green-reliability` branch). It is not published to the catalog by this PR.
+
+The meter forecast compares linear, logarithmic and quadratic progression models
+using causal held-out frames. Uncertainty includes image resolution, forecast
+horizon, validation error and disagreement between plausible models. It may withhold
+an early forecast when the evidence cannot support the configured timing budget;
+a small regression residual alone no longer qualifies a stroke.
+
+Calibration binds both tempo correction and effective stroke duration. Existing
+results without that evidence remain readable but require fresh practice confirmation.
+Cancelled actions, unvalidated local output timing and observed unstable streaming
+cannot supply calibration evidence. The UI shows stream readings and cancellation
+reasons, and prevents saving an older completed receipt after a newer cancellation.
+
+Enable the Xbox statistics overlay in the captured window. Studio reads labelled
+ping/latency, jitter, decode time and FPS in the background with Windows OCR. Adjust
+its normalized crop under **Advanced settings** if necessary. Missing or unstable
+readings pause automatic tuning; they never become zero delay or replace calibrated
+video/input compensation. A documented API for an external app to query the native
+Xbox PC app's stream telemetry was not found. Automatic timing learning also requires
+repeated reliable results in the same distance/coverage context. Use separate saved
+profiles for different contexts. Tempo changes require practice revalidation.
+
+
 ## Direct meter assistance (1.2.12; Studio beta.38+)
 
 Version 1.2.12 records the game's feedback heading separately from its grades.

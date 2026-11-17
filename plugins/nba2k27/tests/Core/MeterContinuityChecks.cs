@@ -12,7 +12,7 @@ internal static class MeterContinuityChecks
         AnchoredCompletionIsExplicit();
         HostRejectsHiddenFailures();
         ForecastTimeIsNotShifted();
-        CurvedFillLinearizationReducesAccelerationDrift();
+        CurvedForecastRequiresEnoughEvidence();
         WeakEarlyFalseLockRecoversCleanly();
         MovingMeterTracksAcrossHorizontalShift();
         DelayedOffDribbleMeterAcquiresAfterClearSearch();
@@ -190,17 +190,18 @@ internal static class MeterContinuityChecks
             "A linear 80 ms target forecast was shifted to bypass scheduler freshness.");
     }
 
-    private static void CurvedFillLinearizationReducesAccelerationDrift()
+    private static void CurvedForecastRequiresEnoughEvidence()
     {
         var profile = new Nba2K27ShotProfile(Guid.NewGuid(), "CurvedFixture", 83, 91, "Base", "Upper 1", "Upper 2", true, "Push");
         var detector = new ScriptedDetector();
         using var predictor = new NbaMeterPredictor(profile, new() { CalibrationTrial = true, HoldMs = 0, TargetProgress = .75 },
             VisionSettings.Default with { MinimumConfidence = .65, MaximumUncertaintyMs = 18 }, detector);
         byte[] pixels = new byte[100 * 100 * 4];
-        // Synthetic accelerating meter matching NBA 2K's convex fill speed: reaches 0.75 at t = 340 ms.
+        // A synthetic accelerating meter reaches 0.75 at t = 340 ms.
+        // Competing models may abstain at early, ambiguous horizons.
         double tAt75 = 340;
         VisionSignalObservation? lastForecast = null;
-        for (int t = 60; t <= 220; t += 20)
+        for (int t = 60; t <= 300; t += 20)
         {
             double s = t / tAt75;
             double p = 0.08 + 0.67 * Math.Pow(s, 1.45);
@@ -208,7 +209,11 @@ internal static class MeterContinuityChecks
             var obs = predictor.Observe(pixels, 100, 100, 400, t, 1, Fixture.Ticks(t),
                 new(new ControllerState { RightY = short.MinValue }, Fixture.Ticks(t), 1, 1, Fixture.Ticks(0), true)
                 { HoldStartedTimestamp = Fixture.Ticks(0) });
-            if (obs.TimeToTargetMs.HasValue) lastForecast = obs;
+            if (obs.TimeToTargetMs is { } forecast)
+            {
+                Check(Math.Abs(t + forecast - tAt75) <= Math.Max(12, obs.UncertaintyMs), "Curved forecast understated its error.");
+                lastForecast = obs;
+            }
         }
         Check(lastForecast is { TimeToTargetMs: { } tau } && Math.Abs((lastForecast.CaptureTimestamp - Fixture.Ticks(0)) * 1000d / Stopwatch.Frequency + tau - tAt75) < 12,
             $"Curved fill forecast drifted too far from true 340 ms target: {lastForecast?.TimeToTargetMs}");
@@ -379,7 +384,7 @@ internal static class MeterContinuityChecks
                 VisionSettings.Default with { MinimumConfidence = minimumConfidence, MaximumUncertaintyMs = 12 }, _detector);
         }
         internal static long Ticks(int ms) => Stopwatch.Frequency * 2 + (long)(ms * Stopwatch.Frequency / 1000d);
-        internal VisionSignalObservation At(int ms, double? progress, double x = 20, double height = 50, bool ambiguous = false, int? inputMs = null,
+        internal VisionSignalObservation At(int ms, double? progress, double x = 20, double height = 160, bool ambiguous = false, int? inputMs = null,
             long shotToken = 1, bool armed = true, long? holdStart = null)
         {
             Time = ms; _detector.Next = progress is { } p ? new(new(.1, .1, .2, .6), p, .95, height, x, 20) : null;

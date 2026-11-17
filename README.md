@@ -47,3 +47,9 @@ Earlier sample packages remain unlisted.
 To publish a change, increment the plugin version, then run tools/package_nba.py
 with --model-cache pointing to a verified capture-model directory. The packager
 refuses to rewrite a version already committed to Git.
+
+Source-only development branches can validate the existing published catalog with
+`python tools/validate.py --catalog-only`. This still verifies every manifest and
+asset hash. The default command also compares package provenance with current
+plugin sources and is required after building a new package. Historical packages
+are not rewritten to match unpublished development changes.

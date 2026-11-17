@@ -6,7 +6,7 @@ using EliteScriptStudio.Core;
 namespace EliteScriptStudio.Packs.Nba2K27;
 
 internal sealed record NbaMeterCalibrationResult(long ReceiptId, string Key, string Timing, string Tempo, long CapturedAt, string RunId, int Width, int Height,
-    string? TuningContextKey = null, double? CorrectionMs = null, double? StrokeDurationMs = null, string? ShotType = null);
+    string? TuningContextKey = null, double? CorrectionMs = null, double? StrokeDurationMs = null, string? ShotType = null, double? TempoCorrectionMs = null, double? EffectiveStrokeDurationMs = null);
 internal sealed record NbaMeterSettings
 {
     public int Version { get; init; } = 1;
@@ -52,17 +52,20 @@ internal sealed record NbaMeterSettings
             || Results is null || Results.Length > 64 || Results.Any(r => r is null || r.ReceiptId <= 0 || r.Key is null || r.Key.Length != 64 || r.RunId is null || r.RunId.Length != 32 || r.Width is <= 0 or > 16384 || r.Height is <= 0 or > 16384
                 || r.Timing is not ("early" or "slightlyEarly" or "excellent" or "slightlyLate" or "late")
                 || r.Tempo is not ("fast" or "slightlyFast" or "excellent" or "slightlySlow" or "slow" or "none")
+                || r.TempoCorrectionMs is { } tempo && !Between(tempo, -200, 200)
+                || r.EffectiveStrokeDurationMs is { } duration && !Between(duration, 8, 500)
                 || r.ShotType is not (null or "rhythm" or "timing") || (r.ShotType == "timing" && r.Tempo != "none")))
             throw new InvalidDataException("Choose supported meter, input and calibration settings.");
     }
     internal string Key(Nba2K27ShotProfile profile, VisionSettings settings)
     {
-        string value = JsonSerializer.Serialize(new { policy = "direct-curved-fill-v4", ConfigurationFingerprint = (profile with { Gamertag = "" }).ConfigurationFingerprint, profile.CameraView, InputMode, Trigger, Style,
+        string value = JsonSerializer.Serialize(new { policy = "direct-curved-fill-v5", ConfigurationFingerprint = (profile with { Gamertag = "" }).ConfigurationFingerprint, profile.CameraView, InputMode, Trigger, Style,
             Viewport, TargetRed, TargetGreen, TargetBlue, ColorToleranceDegrees, HoldMs, AcquisitionWindowMs, StrokeDurationMs, AnchorFraction, UpHoldMs,
             TargetProgress, SmoothStroke, GameBuild, settings.CaptureSourceKey, settings.ShootButton, settings.MinimumConfidence, settings.MaximumUncertaintyMs,
-            settings.MaximumFrameAgeMs, settings.MaximumLatenessMs, settings.EstimatedVideoDelayMs, settings.EstimatedInputDelayMs, settings.CorrectionMs }, Json);
+            settings.MaximumFrameAgeMs, settings.MaximumLatenessMs, settings.EstimatedVideoDelayMs, settings.EstimatedInputDelayMs, settings.CorrectionMs, settings.TempoCorrectionMs, settings.TrainingCapture.ShotCategory }, Json);
         return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
     }
+    internal double EffectiveStrokeMs(VisionSettings settings) => Math.Clamp(StrokeDurationMs + settings.TempoCorrectionMs, 8, 500);
     internal bool Accepted(Nba2K27ShotProfile profile, VisionSettings settings)
     {
         if (!Confirmed || string.IsNullOrWhiteSpace(GameBuild) || CalibratedWidth <= 0 || CalibratedHeight <= 0)
@@ -72,6 +75,7 @@ internal sealed record NbaMeterSettings
         return Results.Count(r => (!CalibrationTrial
                 ? (r.TuningContextKey == tuningKey && r.StrokeDurationMs == StrokeDurationMs)
                 : r.Key == key)
+            && r.EffectiveStrokeDurationMs == EffectiveStrokeMs(settings) && r.TempoCorrectionMs == settings.TempoCorrectionMs
             && r.Width == CalibratedWidth && r.Height == CalibratedHeight && Successful(r)) >= 3;
     }
     internal bool Successful(NbaMeterCalibrationResult result) => result.Timing == "excellent" && (InputMode == "button"
@@ -99,7 +103,10 @@ internal sealed record NbaMeterSettings
     {
         Validate();
         string key = Key(profile, settings);
-        if (receipt.ConfigurationKey != key || receipt.RunId.Length != 32 || observation.CaptureWidth <= 0 || observation.CaptureHeight <= 0
+        if (receipt.Outcome != VisionActionOutcome.Completed || !receipt.EligibleForFeedback
+            || (InputMode == "rhythm" && receipt.StrokeDurationMs != EffectiveStrokeMs(settings))
+            || receipt.StreamTelemetry is { State: "unstable" }
+            || receipt.ConfigurationKey != key || receipt.RunId.Length != 32 || observation.CaptureWidth <= 0 || observation.CaptureHeight <= 0
             || observation.CaptureTimestamp < receipt.StartedTimestamp)
             throw new InvalidDataException("A new completed calibration action from this exact setup is required.");
         if (feedback.TryGetProperty("confirmOnly", out var only) && only.GetBoolean())
@@ -114,7 +121,7 @@ internal sealed record NbaMeterSettings
         string tempo = InputMode == "button" ? "none" : feedback.GetProperty("tempo").GetString() ?? "";
         string? shotType = feedback.TryGetProperty("shotType", out var heading) ? heading.GetString() : null;
         var result = new NbaMeterCalibrationResult(receipt.Id, key, timing, tempo, observation.CaptureTimestamp, receipt.RunId, observation.CaptureWidth, observation.CaptureHeight,
-            TuningContextKey(profile, settings), settings.CorrectionMs, StrokeDurationMs, shotType);
+            TuningContextKey(profile, settings), settings.CorrectionMs, StrokeDurationMs, shotType, settings.TempoCorrectionMs, EffectiveStrokeMs(settings));
         var updated = this with { Results = Results.Append(result).TakeLast(64).ToArray(), Confirmed = false,
             CalibratedWidth = observation.CaptureWidth, CalibratedHeight = observation.CaptureHeight };
         updated.Validate();

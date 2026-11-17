@@ -1,5 +1,6 @@
 using EliteScriptStudio.Core;
 
+if (args is ["--meter-forecast"]) { MeterForecastChecks.Run(); return; }
 if (args is ["--meter-continuity"]) { MeterContinuityChecks.Run(); return; }
 if (args is ["--meter-fixtures", var oldMeterSession, var armedMeterDiagnostic, var heldMeterReplay])
 { MeterDetectorFixtureChecks.Run(oldMeterSession, armedMeterDiagnostic, heldMeterReplay); return; }
@@ -50,4 +51,7 @@ if (args is ["--game-plugin"])
 
 Nba2K27ShotProfileVerification.Run();
 FeedbackChecks.Run();
+MeterChecks.Calibration();
+MeterContinuityChecks.Run();
+MeterForecastChecks.Run();
 Console.WriteLine("SUCCESS NBA profile compatibility and controller feedback checks.");

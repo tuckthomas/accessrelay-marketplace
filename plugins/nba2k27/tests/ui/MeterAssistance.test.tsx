@@ -15,6 +15,39 @@ function fixture(overrides: any = {}) {
 }
 
 describe('meter calibration workflow', () => {
+  it('shows actual stream readings without configuring or arming output, and marks missing measurements unavailable', () => {
+    const command = vi.fn(), state = fixture();
+    const view = render(<Workspace mode="live" state={state} status={{ ...state.status, streamTelemetry: { state: 'stable', message: 'Stream stable.',
+      latest: { pingMs: 12, jitterMs: 1.5, decodeMs: 2, fps: 60 } } }} command={command} />);
+    expect(screen.getByText('12.0 ms')).toBeTruthy();
+    expect(screen.getByText('1.5 ms')).toBeTruthy();
+    expect(screen.getByText('60.0 FPS')).toBeTruthy();
+    expect(command).not.toHaveBeenCalled();
+    view.rerender(<Workspace mode="live" state={state} status={{ ...state.status, streamTelemetry: { state: 'unavailable', message: 'No fresh statistics.' } }} command={command} />);
+    expect(screen.getByText('No fresh statistics.')).toBeTruthy();
+    expect(screen.queryByText('0.0 ms')).toBeNull();
+    expect(screen.queryByText('12.0 ms')).toBeNull();
+  });
+  it('does not save a previous completed receipt when the latest attempt was cancelled', () => {
+    const command = vi.fn(), state = fixture();
+    render(<Workspace mode="live" state={state} status={{ ...state.status,
+      lastAction: { id: 2, runId: 'run', configurationKey: 'current-setup', eligibleForFeedback: true },
+      lastAttempt: { id: 3, runId: 'run', outcome: 'cancelled', cancellationReason: 'Tracking lost' },
+      output: { armed: true, holdingCancelledPaddleShot: true } }} command={command} />);
+    expect(screen.getByText(/Release the paddle to return the stick to neutral/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Save result' })).toBeNull();
+    expect(command).not.toHaveBeenCalled();
+  });
+  it('keeps unvalidated output feedback out of automatic practice saving', () => {
+    const command = vi.fn(), state = fixture();
+    render(<Workspace mode="live" state={state} status={{ ...state.status,
+      lastAction: { id: 2, runId: 'run', configurationKey: 'current-setup', eligibleForFeedback: false },
+      ocrFeedback: { receiptId: 2, runId: 'run', timing: 'excellent', tempo: 'excellent', shotType: 'rhythm', feedbackEligible: false } }} command={command} />);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Auto-save OCR practice results & re-arm' }));
+    expect((screen.getByRole('button', { name: 'Save result' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText(/Local output timing was not validated/)).toBeTruthy();
+    expect(command).not.toHaveBeenCalled();
+  });
   it('records RHYTHM Excellent without inventing a separate tempo grade or changing the successful motion', async () => {
     const command = vi.fn().mockResolvedValue(null), state = fixture();
     render(<Workspace mode="live" state={state} status={{ ...state.status,

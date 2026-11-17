@@ -14,9 +14,7 @@ internal sealed class NbaMeterPredictor(Nba2K27ShotProfile profile, NbaMeterSett
     private double _bestUncertainty = double.PositiveInfinity, _bestConfidence;
     private string? _attemptFailure;
     private const double IdentityGraceMs = 70;
-    private const double CurveLogBias = 0.70;
     private const double MinimumVelocityWindowMs = 58;
-    private static readonly double CurveLogDenominator = Math.Log(1d + 1d / CurveLogBias);
     private bool _held, _forecasted;
     private bool _acquired;
     private bool _curvedMeter;
@@ -145,41 +143,16 @@ internal sealed class NbaMeterPredictor(Nba2K27ShotProfile profile, NbaMeterSett
         _history[_count++] = (captureTicks * 1000d / Stopwatch.Frequency, meter.Progress);
         double span = _history[_count - 1].Time - _history[0].Time;
         if (_count < 4 || span < MinimumVelocityWindowMs) return Observation("Measuring the meter's fill velocity.", meter);
-        double sw = 0, mt = 0, mu = 0;
-        for (int i = 0; i < _count; i++)
-        {
-            double w = Math.Pow(.85, _count - 1 - i);
-            sw += w; mt += w * _history[i].Time; mu += w * Linearize(_history[i].Progress);
-        }
-        mt /= sw; mu /= sw;
-        double xx = 0, xy = 0;
-        for (int i = 0; i < _count; i++)
-        {
-            double w = Math.Pow(.85, _count - 1 - i), dt = _history[i].Time - mt;
-            xx += w * dt * dt; xy += w * dt * (Linearize(_history[i].Progress) - mu);
-        }
-        double velocity = xx > 0 ? xy / xx : 0;
-        if (velocity <= .00015 || velocity > .03)
+        var forecast = NbaMeterForecast.Predict(_history, _count, configuration.TargetProgress, meter.Height, _curvedMeter);
+        double velocity = forecast?.Velocity ?? 0;
+        if (forecast is null)
         {
             if (_forecasted) return Fail("Fill velocity became unreliable before a validated completion. Return to neutral.", meter, velocity);
             if (meter.Progress >= .88 && double.IsFinite(_bestUncertainty)) return UnforecastedCompletion(meter, velocity);
-            return Observation("Fill velocity is not yet reliable.", meter, velocity, invalidate: _forecasted);
+            return Observation("Fill velocity is not yet reliable.", meter, velocity);
         }
-        double residual = 0;
-        for (int i = 0; i < _count; i++)
-        {
-            double w = Math.Pow(.85, _count - 1 - i), error = Linearize(_history[i].Progress) - (mu + velocity * (_history[i].Time - mt));
-            residual += w * error * error;
-        }
-        double sigma = Math.Sqrt(residual / Math.Max(.5, sw * Math.Max(1, _count - 2) / _count));
-        double fittedLinear = mu + velocity * (_history[_count - 1].Time - mt);
-        double tau = (Linearize(configuration.TargetProgress) - fittedLinear) / velocity;
-        double extrap = Math.Min(Math.Max(0, tau), Math.Max(1, span * 2.0));
-        double localSlope = LinearDerivative(_history[_count - 1].Progress);
-        // Recency-weighted regression on the linearized curve tracks acceleration cleanly across shot speeds.
-        double uncertainty = Math.Sqrt(sigma * sigma * (1 + 1d / sw + extrap * extrap / xx)
-            + (localSlope * localSlope) / (meter.Height * meter.Height)) / velocity;
-        double confidence = Math.Clamp(meter.Score >= .55 && meter.Score < .7 ? Math.Min(.7, meter.Score + .12) : meter.Score, 0, 1);
+        double tau = forecast.Tau, uncertainty = forecast.Uncertainty;
+        double confidence = Math.Clamp(meter.Score, 0, 1);
         if (tau < 0)
         {
             if (_forecasted) return Fail("The forecast target passed without a validated completion. Return to neutral.", meter, velocity);
@@ -222,10 +195,6 @@ internal sealed class NbaMeterPredictor(Nba2K27ShotProfile profile, NbaMeterSett
                 velocity, tau, confidence ?? found?.Score ?? 0, double.IsFinite(uncertainty) ? uncertainty : 1000, message, _count,
                 Stopwatch.GetElapsedTime(began).TotalMilliseconds, width, height, invalidate);
     }
-    private double Linearize(double progress)
-        => _curvedMeter ? Math.Log(1d + Math.Max(0, progress) / CurveLogBias) / CurveLogDenominator : progress;
-    private double LinearDerivative(double progress)
-        => _curvedMeter ? 1d / ((CurveLogBias + Math.Max(0, progress)) * CurveLogDenominator) : 1d;
     private bool CanRecoverWeakCandidate(NbaMeterDetector.Measurement candidate)
         => !_forecasted && _count <= 2 && candidate.Score < .78;
     private void ClearWeakCandidate()

@@ -160,7 +160,7 @@ internal static class MeterChecks
         string run = Guid.NewGuid().ToString("N");
         var observation = new VisionSignalObservation(1, 200, true, new(.2,.2,.1,.3), .8, 1, .002, 100, .9, 2, "fixture", CaptureWidth: 1280, CaptureHeight: 720);
         var feedback = JsonSerializer.SerializeToElement(new { timing = "excellent", tempo = "excellent" });
-        VisionActionReceipt Receipt(long id) => new(id, 1, id, 100, 150, 190, 80, .5, config.Key(p,settings), run);
+        VisionActionReceipt Receipt(long id) => new(id, 1, id, 100, 150, 190, 80, .5, config.Key(p,settings), run) { EligibleForFeedback = true, ActualStartedTimestamp = 100, ActualAnchorTimestamp = 150 };
         for(int i=1;i<=3;i++) config = config.Feedback(p, settings, feedback, Receipt(i), observation);
         if (config.Results.Any(r => r.CorrectionMs != settings.CorrectionMs || r.StrokeDurationMs != config.StrokeDurationMs
                 || r.TuningContextKey != config.TuningContextKey(p, settings)))
@@ -173,6 +173,14 @@ internal static class MeterChecks
         Reject(() => config.Feedback(p, settings, feedback, Receipt(3), observation), "Duplicate feedback was accepted.");
         config = config.Feedback(p,settings,JsonSerializer.SerializeToElement(new { confirmOnly = true }),Receipt(3),observation);
         if(!config.Accepted(p,settings)) throw new Exception("Three confirmed matching results were not accepted.");
+        if(config.Accepted(p,settings with { TempoCorrectionMs = 100 })) throw new Exception("Tempo edits retained calibration.");
+        if(config.Key(p, settings) == config.Key(p, settings with { TempoCorrectionMs = 100 })) throw new Exception("Tempo correction was absent from action identity.");
+        if((config with { Results = config.Results.Select(r => r with { TempoCorrectionMs = null, EffectiveStrokeDurationMs = null }).ToArray() }).Accepted(p, settings))
+            throw new Exception("Legacy results with unknown effective duration retained calibration.");
+        Reject(() => config.Feedback(p, settings, feedback, Receipt(90) with { Outcome = VisionActionOutcome.Cancelled }, observation), "Cancelled action calibrated.");
+        Reject(() => config.Feedback(p, settings, feedback, Receipt(91) with { EligibleForFeedback = false }, observation), "Unvalidated output calibrated.");
+        Reject(() => config.Feedback(p, settings, feedback, Receipt(92) with { StrokeDurationMs = 156 }, observation), "Different effective stroke calibrated.");
+        Reject(() => config.Feedback(p, settings, feedback, Receipt(93) with { StreamTelemetry = new("unstable", "spike", false, 30, null, 2) }, observation), "Unstable stream calibrated.");
         if(config.Accepted(p,settings with { EstimatedVideoDelayMs = 1 })) throw new Exception("Timing edits retained calibration.");
         if((config with { CalibratedWidth = 2560 }).Accepted(p,settings)) throw new Exception("Results from different resolutions were combined.");
         if(config.Accepted(p with { ShotSpeed = 2 },settings)) throw new Exception("Changed shot profile retained calibration.");

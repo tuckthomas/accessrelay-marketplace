@@ -1,5 +1,5 @@
 import { React, useEffect, useRef, useState, Button, Card, Field, Input, Notice, Select, SelectOption,
-  ProfilePicker, GameplayPreview, Icon, useUnsavedChanges, type VisionWorkspaceProps } from './host.js';
+  ProfilePicker, GameplayPreview, Icon, Checkbox, useUnsavedChanges, type VisionWorkspaceProps } from './host.js';
 import { adjustMeterCalibration, successfulMeterResult } from './MeterCalibration.js';
 
 export const meterDefaults = { version: 1, enabled: true, inputMode: 'rhythm', trigger: 'largeRight', style: 'curved', viewport: { left: 0, top: 0, width: 1, height: 1 },
@@ -9,7 +9,7 @@ export function meterArguments(configuration: any, settings: any) {
   return { configuration, videoDelayMs: settings.estimatedVideoDelayMs ?? 0, inputDelayMs: settings.estimatedInputDelayMs ?? 0,
     correctionMs: settings.correctionMs ?? 0, tempoCorrectionMs: settings.tempoCorrectionMs ?? 0,
     minimumConfidence: settings.minimumConfidence ?? .65, maximumUncertaintyMs: settings.maximumUncertaintyMs ?? 12,
-    shootButton: settings.shootButton ?? 'x' };
+    shootButton: settings.shootButton ?? 'x', streamTelemetry: settings.streamTelemetry ?? { enabled: true, region: { left: .45, top: 0, width: .55, height: .22 } } };
 }
 const fmt = (v: any, digits = 1) => typeof v === 'number' && Number.isFinite(v) ? v.toFixed(digits) : '—';
 const triggerLabels: Record<string, string> = { largeRight: 'P4 · Large right paddle', largeLeft: 'P3 · Large left paddle',
@@ -88,7 +88,8 @@ export function MeterAssistance({ state = {}, status, command, captureWindow, ed
   const savingDiagnostics = !!diagnostic && !diagnostic.isRecording && !diagnostic.isFinalized;
   const switchingBlocked = !!s.stopping || recordingDiagnostics || savingDiagnostics || !!s.training?.isRecording || working || dirty;
   const signature = receipt ? `${receipt.runId}:${receipt.id}` : '';
-  const matching = !!receipt && receipt.configurationKey === calibration.key;
+  const matching = !!receipt && receipt.configurationKey === calibration.key
+    && (!s.lastAttempt || (s.lastAttempt.id === receipt.id && s.lastAttempt.runId === receipt.runId && s.lastAttempt.outcome !== 'cancelled'));
   const used = (calibration.currentResults ?? []).some((r: any) => r.receiptId === receipt?.id && r.runId === receipt?.runId);
   const connected = s.controllerConnection?.connected ?? connectionConfirmed;
   const inputMissing = s.controllerConnection?.inputConnected === false;
@@ -101,7 +102,7 @@ export function MeterAssistance({ state = {}, status, command, captureWindow, ed
   const ocrMatches = !!ocr && !!receipt && ocr.receiptId === receipt.id && ocr.runId === receipt.runId;
   useEffect(() => { setFeedback({ timing: '', tempo: '', shotType: '' }); }, [signature]);
   useEffect(() => {
-    if (!awaitingFeedback || !ocrMatches || !config.autoOcrTiming) return;
+    if (!awaitingFeedback || !ocrMatches || !config.autoOcrTiming || ocr.feedbackEligible === false || receipt?.eligibleForFeedback === false) return;
     const nextFeedback = {
       shotType: config.inputMode === 'rhythm' ? (ocr.shotType || 'rhythm') : '',
       timing: ocr.timing || '',
@@ -311,6 +312,16 @@ export function MeterAssistance({ state = {}, status, command, captureWindow, ed
       <Button disabled={working} onClick={() => setCopying(false)}>Cancel</Button>
     </div>}{profile && <p className="subtle meter-profile-summary">{profile.cameraView} camera · {profile.meterReleaseType || 'Release cue not set'} · {profile.usesShotMeter ? 'Meter on' : 'Meter off'}</p>}
     {config.inputMode === 'rhythm' && (config.trigger ?? 'largeRight') !== 'physicalStick' && <p className="subtle meter-profile-summary">Paddle trigger: map the selected paddle to its PC Profile Numpad key in Xbox Accessories so the Xbox app ignores it and Studio drives the full virtual stick stroke. Keep the physical right stick centered.</p>}</Card>
+    <Card title="Xbox stream statistics" description="Enable the statistics overlay in Xbox Remote Play. Studio reads it in the background. Displayed ping or latency does not measure the full controller-to-screen delay.">
+      <p role="status">{s.streamTelemetry?.message || 'Statistics will appear when gameplay capture starts.'}</p>
+      {s.streamTelemetryReader && <p className="subtle">{s.streamTelemetryReader}</p>}
+      <div className="meter-readings">{[['Ping', s.streamTelemetry?.latest?.pingMs, 'ms'], ['Jitter', s.streamTelemetry?.latest?.jitterMs, 'ms'],
+        ['Decode', s.streamTelemetry?.latest?.decodeMs, 'ms'], ['Stream FPS', s.streamTelemetry?.latest?.fps, 'FPS']].map(([label, value, unit]) =>
+        <div key={label}><span>{label}</span><strong>{s.streamTelemetry?.state === 'unavailable' ? '—' : `${fmt(value)} ${unit}`}</strong></div>)}</div>
+      <p className="subtle">Unstable or unreadable statistics pause automatic tuning. Reliable repeated shot feedback tunes the effective correction; ping is never subtracted directly from release timing.</p>
+      {receipt?.eligibleForFeedback === false && s.lastAttempt?.outcome !== 'cancelled' && <Notice>Local output timing was not validated. This attempt is diagnostic only; complete a new practice trial.</Notice>}
+      {s.lastAttempt?.outcome === 'cancelled' && <Notice>Attempt cancelled: {s.lastAttempt.cancellationReason}. {output.holdingCancelledPaddleShot ? 'Release the paddle to return the stick to neutral.' : 'No successful release was recorded.'}</Notice>}
+    </Card>
     <div className="meter-layout">
       <div className="meter-capture"><GameplayPreview status={s} window={captureWindow} onError={setError} actions={locked
         ? <Button active={!!session.running} disabled={!!s.stopping} onClick={() => void stopPreview()}>Stop preview</Button>
@@ -368,17 +379,17 @@ export function MeterAssistance({ state = {}, status, command, captureWindow, ed
               <SelectOption value="" disabled>Choose timing…</SelectOption>{timingOptions.map(([value, label]) => <SelectOption key={value} value={value}>{label}</SelectOption>)}</Select></Field>
             {config.inputMode === 'rhythm' && <Field label="Shot tempo"><Select value={feedback.tempo} disabled={working || feedback.shotType === 'timing'} onValueChange={v => setFeedback(old => ({ ...old, tempo: v }))}>
               <SelectOption value="" disabled>Choose tempo…</SelectOption>{tempoOptions.map(([value, label]) => <SelectOption key={value} value={value}>{label}</SelectOption>)}</Select></Field>}
-            <div className="button-group"><Button variant="primary" busy={busy === 'signalFeedback'} disabled={working || dirty || !feedback.timing || (config.inputMode === 'rhythm' && (!feedback.shotType || !feedback.tempo))} onClick={() => void saveFeedbackWith()}>Save result</Button>
+            <div className="button-group"><Button variant="primary" busy={busy === 'signalFeedback'} disabled={working || dirty || receipt?.eligibleForFeedback === false || !feedback.timing || (config.inputMode === 'rhythm' && (!feedback.shotType || !feedback.tempo))} onClick={() => void saveFeedbackWith()}>Save result</Button>
               <Button disabled={working} onClick={() => { setSkipped(signature); setFeedback({ timing: '', tempo: '', shotType: '' }); }}>Skip this result</Button></div></div>
             : <p className="subtle">{used ? 'Result saved. Start another practice trial when ready.' : 'Shot feedback appears here after Studio completes a controller action.'}</p>}
           {successes >= 3 && <Button variant="primary" disabled={working || !matching || awaitingFeedback} onClick={() => void confirm()}>Save calibration</Button>}
         </>}
         {accepted && <p className="subtle">Calibration saved for this profile, capture size and timing setup.</p>}
         <div className="meter-ocr-box">
-          <label className="meter-ocr-toggle"><input type="checkbox" checked={config.autoOcrTiming !== false} disabled={working || !!output.armed}
+          <label className="meter-ocr-toggle"><Checkbox checked={config.autoOcrTiming !== false} disabled={working || !!output.armed}
             onChange={e => { const next = { ...config, autoOcrTiming: e.target.checked }; setConfig(next); if (profile) void save(next, true).catch(() => {}); }} />
             <span>Auto-adapt timing from shot feedback (OCR)</span></label>
-          {!accepted && <label className="meter-ocr-toggle"><input type="checkbox" checked={autoSubmitPractice} disabled={working || config.autoOcrTiming === false}
+          {!accepted && <label className="meter-ocr-toggle"><Checkbox checked={autoSubmitPractice} disabled={working || config.autoOcrTiming === false}
             onChange={e => setAutoSubmitPractice(e.target.checked)} />
             <span>Auto-save OCR practice results &amp; re-arm</span></label>}
           {ocr?.message && <p className="subtle" role="status">{ocr.message}{ocr.distance || ocr.coverage ? ` [${[ocr.distance, ocr.coverage].filter(Boolean).join(' · ')}]` : ''}{ocr.rawText ? ` (${ocr.rawText})` : ''}</p>}
@@ -400,6 +411,11 @@ export function MeterAssistance({ state = {}, status, command, captureWindow, ed
       </Card>
     </div>
     <details className="meter-advanced"><summary>Advanced settings</summary><Card title="Timing & detection">
+      <label className="meter-ocr-toggle"><Checkbox checked={timing.streamTelemetry?.enabled !== false} disabled={working || !!output.armed}
+        onChange={e => { setTiming((old: any) => ({ ...old, streamTelemetry: { ...meterArguments(config, old).streamTelemetry, enabled: e.target.checked } })); setDirty(true); }} />Monitor Xbox stream statistics</label>
+      <div className="form-grid">{(['left', 'top', 'width', 'height'] as const).map(key => <Field key={key} label={`Statistics region ${key} · %`}>
+        <Input type="number" min={0} max={100} step={1} value={Math.round(meterArguments(config, timing).streamTelemetry.region[key] * 100)} disabled={working || !!output.armed}
+          onChange={e => { const stats = meterArguments(config, timing).streamTelemetry; setTiming((old: any) => ({ ...old, streamTelemetry: { ...stats, region: { ...stats.region, [key]: +e.target.value / 100 } } })); setDirty(true); }} /></Field>)}</div>
       <div className="form-grid"><Field label="Game build" info="Tracks the NBA 2K27 patch version for this calibration so results are kept separate across game updates."><Input value={config.gameBuild} maxLength={80} disabled={working || !!output.armed} onChange={e => edit('gameBuild', e.target.value)} /></Field>
         {number('Stroke duration · ms', 'strokeDurationMs', 8, 500, 1, 'How fast the virtual right stick flips from down to up for a rhythm shot. Lower = faster tempo; higher = slower tempo.')}
         {number('Timing anchor · axis fraction', 'anchorFraction', 0, 1, .05, 'Point along the stick flip that counts as your release timing point (0.5 = center crossing; 0.85 = near full-up).')}

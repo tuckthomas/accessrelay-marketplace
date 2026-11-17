@@ -1,8 +1,13 @@
 """Validate catalog/package identities and exact source hashes without executing scripts."""
+import argparse
 import hashlib
 import json
 import re
 from pathlib import Path
+
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--catalog-only', action='store_true', help='Validate immutable package assets without comparing historical source hashes to the working tree.')
+args = parser.parse_args()
 
 root = Path(__file__).resolve().parents[1]
 catalog = json.loads((root / 'catalog.json').read_text(encoding='utf-8'))
@@ -56,7 +61,7 @@ for item in catalog['entries']:
         assert hashlib.sha256(data).hexdigest() == asset['sha256']
     if 'runtime' in manifest:
         runtime = manifest['runtime']
-        assert runtime['contractVersion'] in (1, 2, 3)
+        assert runtime['contractVersion'] in (1, 2, 3, 4)
         declared = {a['path']: a['kind'] for a in manifest['assets']}
         for key, kind in [('assembly','runtime'), ('uiEntry','ui'), ('trainingEntry','workflow'), ('auditEntry','workflow'), ('experimentsEntry','workflow')]:
             assert declared[runtime[key]] == kind
@@ -65,11 +70,14 @@ for item in catalog['entries']:
         for name, digest in provenance['sources'].items():
             source = (root / name).resolve()
             assert source.is_relative_to(root / 'plugins')
-            assert hashlib.sha256(source.read_bytes().replace(b'\r\n', b'\n')).hexdigest() == digest, name
+            assert re.fullmatch(r'[a-f0-9]{64}', digest), name
+            if not args.catalog_only:
+                assert hashlib.sha256(source.read_bytes().replace(b'\r\n', b'\n')).hexdigest() == digest, name
         ui_files = [path.parent / a['path'] for a in manifest['assets'] if a['kind'] == 'ui']
         for file in ui_files:
             text = file.read_text(encoding='utf-8')
             assert not re.search(r"from\s+['\"]react(?:/|['\"])", text), file
         files = {str(f.relative_to(path.parent)).replace('\\','/') for f in path.parent.rglob('*') if f.is_file()}
         assert files == set(declared) | {'pack.json'}, 'Unlisted package resources'
-print(f"SUCCESS: {len(seen)} versioned marketplace packages and source hashes validated.")
+scope = "catalog assets" if args.catalog_only else "catalog assets and current source hashes"
+print(f"SUCCESS: {len(seen)} versioned marketplace packages validated ({scope}).")
