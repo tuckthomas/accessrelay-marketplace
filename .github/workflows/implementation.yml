@@ -14,9 +14,25 @@ jobs:
       - uses: actions/checkout@v5
         with:
           path: AccessRelayMarketplace-Source
+      - name: Resolve the companion Studio contract
+        id: studio
+        env:
+          MARKETPLACE_BRANCH: ${{ github.head_ref || github.ref_name }}
+        run: |
+          $ref = "refs/heads/$env:MARKETPLACE_BRANCH"
+          $match = git ls-remote --refs https://github.com/tuckthomas/accessrelay-studio.git $ref
+          if ($LASTEXITCODE -ne 0) { throw 'Could not resolve the Studio repository.' }
+          $revision = 'main'
+          foreach ($line in $match) {
+            $sha, $branch = $line -split "\s+", 2
+            if ($branch -ceq $ref -and $sha -match '^[a-f0-9]{40}$') { $revision = $sha }
+          }
+          "revision=$revision" >> $env:GITHUB_OUTPUT
+          Write-Output "Testing with Studio $revision"
       - uses: actions/checkout@v5
         with:
           repository: tuckthomas/accessrelay-studio
+          ref: ${{ steps.studio.outputs.revision }}
           path: AccessRelayStudio-Source
       - uses: actions/setup-dotnet@v5
         with:
