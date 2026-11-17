@@ -104,7 +104,7 @@ internal sealed class NbaMeterDetector(NbaMeterSettings settings) : INbaMeterDet
             caps.Add(new(left+sumX/tail*step,top+sumY/tail*step,Math.Sqrt(w*w+h*h),tail));
         }
         Measurement? best=null;double second=0;
-        bool hasReliablePrior = _previous is { } priorState && priorState.Progress > .03;
+        bool hasReliablePrior = _previous is { } priorState && priorState.Progress >= .15;
         foreach(var cap in caps.OrderByDescending(c=>c.Area).Take(24))
         {
             Measurement? candidate=null;
@@ -218,7 +218,7 @@ internal sealed class NbaMeterDetector(NbaMeterSettings settings) : INbaMeterDet
         }
         // A ribbon has a flat neutral interior across its width. Poster/text strokes
         // below a green feedback box can otherwise achieve a plausible edge score.
-        return supported>=12 ? Math.Max(0, Math.Min(1,total/28*1.6*(supported>=14?1d:.88)) - pastEndRibbon*.08) : 0;
+        return supported>=12 ? Math.Max(0, Math.Min(1,total/28*1.6*(supported>=14?1d:.88)) - pastEndRibbon*.12) : 0;
     }
     private double Progress(ReadOnlySpan<byte> p,int width,int height,int stride,Measurement meter)
     {

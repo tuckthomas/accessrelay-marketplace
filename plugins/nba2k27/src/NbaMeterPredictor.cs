@@ -186,12 +186,13 @@ internal sealed class NbaMeterPredictor(Nba2K27ShotProfile profile, NbaMeterSett
             if (double.IsFinite(_bestUncertainty)) return UnforecastedCompletion(meter, velocity);
             return Observation("The observed target has passed. Return to neutral.", meter, velocity, confidence, uncertainty, invalidate: _forecasted);
         }
+        double effectiveMaxUncertainty = tau > 140 ? Math.Min(settings.MaximumUncertaintyMs, 7.5) : settings.MaximumUncertaintyMs;
         if (tau <= 400 && double.IsFinite(uncertainty))
         {
             _bestUncertainty = Math.Min(_bestUncertainty, uncertainty);
             _bestConfidence = Math.Max(_bestConfidence, confidence);
         }
-        if (tau > 400 || !double.IsFinite(uncertainty) || uncertainty > settings.MaximumUncertaintyMs || confidence < settings.MinimumConfidence)
+        if (tau > 400 || !double.IsFinite(uncertainty) || uncertainty > effectiveMaxUncertainty || confidence < settings.MinimumConfidence)
         {
             if (!_forecasted && meter.Progress >= .88 && double.IsFinite(_bestUncertainty))
                 return UnforecastedCompletion(meter, velocity);

@@ -1,6 +1,6 @@
 {
   "name": "@accessrelay/nba2k27",
-  "version": "2.1.2",
+  "version": "2.1.3",
   "private": true,
   "type": "module",
   "scripts": { "build": "node build-ui.mjs", "test": "vitest run" },
