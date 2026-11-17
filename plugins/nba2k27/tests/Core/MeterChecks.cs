@@ -173,6 +173,10 @@ internal static class MeterChecks
         Reject(() => config.Feedback(p, settings, feedback, Receipt(3), observation), "Duplicate feedback was accepted.");
         config = config.Feedback(p,settings,JsonSerializer.SerializeToElement(new { confirmOnly = true }),Receipt(3),observation);
         if(!config.Accepted(p,settings)) throw new Exception("Three confirmed matching results were not accepted.");
+        var direct = settings with { CaptureSourceKey = "xhome-fixture-console" };
+        if (config.Accepted(p, direct) || config.TuningContextKey(p, direct) == config.TuningContextKey(p, settings))
+            throw new Exception("Window evidence qualified the direct Xbox source.");
+        if (!config.Accepted(p, settings)) throw new Exception("Switching sources discarded accepted window evidence.");
         if(config.Accepted(p,settings with { TempoCorrectionMs = 100 })) throw new Exception("Tempo edits retained calibration.");
         if(config.Key(p, settings) == config.Key(p, settings with { TempoCorrectionMs = 100 })) throw new Exception("Tempo correction was absent from action identity.");
         if((config with { Results = config.Results.Select(r => r with { TempoCorrectionMs = null, EffectiveStrokeDurationMs = null }).ToArray() }).Accepted(p, settings))
