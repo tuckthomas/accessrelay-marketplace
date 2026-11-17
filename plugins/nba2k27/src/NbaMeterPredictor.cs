@@ -70,7 +70,7 @@ internal sealed class NbaMeterPredictor(Nba2K27ShotProfile profile, NbaMeterSett
             return Fail("Frame cadence broke. Return to neutral before the next attempt.");
         _lastCapture = captureTicks;
         double heldMs = Math.Max(0, (captureTicks - _holdStart) * 1000d / Stopwatch.Frequency);
-        if (captureTicks < _holdStart || heldMs < configuration.HoldMs) return Observation("Waiting for the shot trigger hold to qualify.");
+        if (captureTicks < _holdStart || heldMs < configuration.HoldMs) return Observation("Qualifying the shot trigger hold.");
         if (heldMs > settings.MaximumShotDurationMs) return Fail("Shot expired. Release the shot trigger before the next shot.");
         if (!_acquired && heldMs > configuration.AcquisitionWindowMs + settings.EstimatedVideoDelayMs)
             return Fail("No new meter appeared inside the input acquisition window. Return to neutral.");
