@@ -53,6 +53,25 @@ jobs:
       - run: dotnet run --project plugins/nba2k27/tests/Core/PluginVerification.csproj -c Release
       - run: pnpm --dir plugins/nba2k27 test
       - run: dotnet run --project ../AccessRelayStudio-Source/src/AccessRelayStudio/Verification/Verification.csproj -c Release -- --installed-plugin packages/nba2k27/2.1.1/pack.json artifacts/loader
+      - name: Build and import this checkout's add-on
+        id: package
+        run: |
+          $version = (Get-Content plugins/nba2k27/package.json | ConvertFrom-Json).version
+          $pack = "packages/nba2k27/$version"
+          if (-not (Test-Path "$pack/pack.json")) {
+            python tools/package_nba.py --sdk ../AccessRelayStudio-Source --model-cache packages/nba2k27/2.1.5/capture-models
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          python tools/validate.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet run --project ../AccessRelayStudio-Source/src/AccessRelayStudio/Verification -c Release -- --installed-plugin "$pack/pack.json" artifacts/current-loader
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "directory=$pack" >> $env:GITHUB_OUTPUT
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nba2k27-package
+          path: AccessRelayMarketplace-Source/${{ steps.package.outputs.directory }}/
+          if-no-files-found: error
       - run: python -S -m unittest discover -s plugins/nba2k27/tests/python -p 'test_*.py' -v
       - run: dotnet build plugins/nba2k27/tests/Windows/PluginWindowsVerification.csproj -c Release
       - run: dotnet run --project plugins/nba2k27/tests/Assistant/PluginAssistantVerification.csproj -c Release -- --python (Get-Command python).Source

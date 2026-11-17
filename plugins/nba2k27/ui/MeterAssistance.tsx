@@ -87,6 +87,8 @@ export function MeterAssistance({ state = {}, status, command, captureWindow, ed
   const diagnostic = s.diagnosticRecording, recordingDiagnostics = !!diagnostic?.isRecording;
   const savingDiagnostics = !!diagnostic && !diagnostic.isRecording && !diagnostic.isFinalized;
   const switchingBlocked = !!s.stopping || recordingDiagnostics || savingDiagnostics || !!s.training?.isRecording || working || dirty;
+  const nativeStats = s.streamTelemetry?.direct;
+  const streamStats = nativeStats ?? s.streamTelemetry?.latest;
   const signature = receipt ? `${receipt.runId}:${receipt.id}` : '';
   const matching = !!receipt && receipt.configurationKey === calibration.key
     && (!s.lastAttempt || (s.lastAttempt.id === receipt.id && s.lastAttempt.runId === receipt.runId && s.lastAttempt.outcome !== 'cancelled'));
@@ -311,13 +313,13 @@ export function MeterAssistance({ state = {}, status, command, captureWindow, ed
       <Button variant="primary" disabled={switchingBlocked || !copyName.trim()} busy={busy === 'profileDuplicate'} onClick={() => { void duplicateProfile(); }}>Save copy</Button>
       <Button disabled={working} onClick={() => setCopying(false)}>Cancel</Button>
     </div>}{profile && <p className="subtle meter-profile-summary">{profile.cameraView} camera · {profile.meterReleaseType || 'Release cue not set'} · {profile.usesShotMeter ? 'Meter on' : 'Meter off'}</p>}
-    {config.inputMode === 'rhythm' && (config.trigger ?? 'largeRight') !== 'physicalStick' && <p className="subtle meter-profile-summary">Paddle trigger: map the selected paddle to its PC Profile Numpad key in Xbox Accessories so the Xbox app ignores it and Studio drives the full virtual stick stroke. Keep the physical right stick centered.</p>}</Card>
+    {config.inputMode === 'rhythm' && (config.trigger ?? 'largeRight') !== 'physicalStick' && <p className="subtle meter-profile-summary">Map the selected paddle to its PC Profile Numpad key in Xbox Accessories. Hold the paddle with the physical right stick centered. Studio generates the full downstroke and upstroke.</p>}</Card>
     <Card title="Xbox stream statistics" description="Enable the statistics overlay in Xbox Remote Play. Studio reads it in the background. Displayed ping or latency does not measure the full controller-to-screen delay.">
       <p role="status">{s.streamTelemetry?.message || 'Statistics will appear when gameplay capture starts.'}</p>
       {s.streamTelemetryReader && <p className="subtle">{s.streamTelemetryReader}</p>}
-      <div className="meter-readings">{[['Ping', s.streamTelemetry?.latest?.pingMs, 'ms'], ['Jitter', s.streamTelemetry?.latest?.jitterMs, 'ms'],
-        ['Decode', s.streamTelemetry?.latest?.decodeMs, 'ms'], ['Stream FPS', s.streamTelemetry?.latest?.fps, 'FPS']].map(([label, value, unit]) =>
-        <div key={label}><span>{label}</span><strong>{s.streamTelemetry?.state === 'unavailable' ? '—' : `${fmt(value)} ${unit}`}</strong></div>)}</div>
+      <div className="meter-readings">{[[nativeStats?.rttSource === 'ICMP to selected LAN peer' ? 'LAN ping' : nativeStats ? 'ICE RTT' : 'Ping', nativeStats ? nativeStats.rttMs : streamStats?.pingMs, 'ms'], ['Jitter', streamStats?.jitterMs, 'ms'],
+        ['Decode', streamStats?.decodeMs, 'ms'], ['Stream FPS', streamStats?.fps, 'FPS']].map(([label, value, unit]) =>
+        <div key={label}><span>{label}</span><strong>{typeof value !== 'number' ? '—' : `${fmt(value)} ${unit}`}</strong></div>)}</div>
       <p className="subtle">Unstable or unreadable statistics pause automatic tuning. Reliable repeated shot feedback tunes the effective correction; ping is never subtracted directly from release timing.</p>
       {receipt?.eligibleForFeedback === false && s.lastAttempt?.outcome !== 'cancelled' && <Notice>Local output timing was not validated. This attempt is diagnostic only; complete a new practice trial.</Notice>}
       {s.lastAttempt?.outcome === 'cancelled' && <Notice>Attempt cancelled: {s.lastAttempt.cancellationReason}. {output.holdingCancelledPaddleShot ? 'Release the paddle to return the stick to neutral.' : 'No successful release was recorded.'}</Notice>}
@@ -413,9 +415,9 @@ export function MeterAssistance({ state = {}, status, command, captureWindow, ed
     <details className="meter-advanced"><summary>Advanced settings</summary><Card title="Timing & detection">
       <label className="meter-ocr-toggle"><Checkbox checked={timing.streamTelemetry?.enabled !== false} disabled={working || !!output.armed}
         onChange={e => { setTiming((old: any) => ({ ...old, streamTelemetry: { ...meterArguments(config, old).streamTelemetry, enabled: e.target.checked } })); setDirty(true); }} />Monitor Xbox stream statistics</label>
-      <div className="form-grid">{(['left', 'top', 'width', 'height'] as const).map(key => <Field key={key} label={`Statistics region ${key} · %`}>
+      {!s.xbox?.direct && <div className="form-grid">{(['left', 'top', 'width', 'height'] as const).map(key => <Field key={key} label={`Statistics region ${key} · %`}>
         <Input type="number" min={0} max={100} step={1} value={Math.round(meterArguments(config, timing).streamTelemetry.region[key] * 100)} disabled={working || !!output.armed}
-          onChange={e => { const stats = meterArguments(config, timing).streamTelemetry; setTiming((old: any) => ({ ...old, streamTelemetry: { ...stats, region: { ...stats.region, [key]: +e.target.value / 100 } } })); setDirty(true); }} /></Field>)}</div>
+          onChange={e => { const stats = meterArguments(config, timing).streamTelemetry; setTiming((old: any) => ({ ...old, streamTelemetry: { ...stats, region: { ...stats.region, [key]: +e.target.value / 100 } } })); setDirty(true); }} /></Field>)}</div>}
       <div className="form-grid"><Field label="Game build" info="Tracks the NBA 2K27 patch version for this calibration so results are kept separate across game updates."><Input value={config.gameBuild} maxLength={80} disabled={working || !!output.armed} onChange={e => edit('gameBuild', e.target.value)} /></Field>
         {number('Stroke duration · ms', 'strokeDurationMs', 8, 500, 1, 'How fast the virtual right stick flips from down to up for a rhythm shot. Lower = faster tempo; higher = slower tempo.')}
         {number('Timing anchor · axis fraction', 'anchorFraction', 0, 1, .05, 'Point along the stick flip that counts as your release timing point (0.5 = center crossing; 0.85 = near full-up).')}
