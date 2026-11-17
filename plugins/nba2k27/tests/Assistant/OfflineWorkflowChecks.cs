@@ -80,7 +80,18 @@ time.sleep(60)
             catch { if (!disposed) await stalled.DisposeAsync(); throw; }
             Console.WriteLine("PASS real stdlib audit and six-job plan-only runner, foreground admission races, registered IDs, private-path redaction, source changes and revoked offline access.");
         }
-        finally { Directory.Delete(root, recursive: true); }
+        finally
+        {
+            // Windows can briefly retain the worker's current-directory handle after the child exits.
+            var cleanup = System.Diagnostics.Stopwatch.StartNew();
+            while (Directory.Exists(root))
+            {
+                try { Directory.Delete(root, recursive: true); }
+                catch (IOException error) when (OperatingSystem.IsWindows() && cleanup.Elapsed.TotalSeconds < 5 &&
+                    (error.HResult & 0xffff) is 32 or 33 or 145)
+                { await Task.Delay(100); }
+            }
+        }
     }
     static async Task StartAndWait(OfflineJobManager manager, string operation, object args)
     {
