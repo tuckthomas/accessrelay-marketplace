@@ -56,7 +56,7 @@ internal sealed record Nba2K27ShotProfile(Guid Id, string Name, int HeightInches
     JsonElement IVisionCaptureProfile.ConfigureLiveAssistance(VisionSettings current, JsonElement proposed)
     {
         var previous = NbaMeterSettings.Read(current);
-        var edited = proposed.Deserialize<NbaMeterSettings>(NbaMeterSettings.Json) ?? throw new InvalidDataException("Meter settings are empty.");
+        var edited = NbaMeterSettings.Parse(proposed);
         // UI edits cannot manufacture completed actions or confirm calibration.
         edited = edited with { Results = previous.Results, Confirmed = previous.Confirmed,
             CalibratedWidth = previous.CalibratedWidth, CalibratedHeight = previous.CalibratedHeight };

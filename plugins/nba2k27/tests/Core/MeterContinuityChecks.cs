@@ -194,7 +194,7 @@ internal static class MeterContinuityChecks
     {
         var profile = new Nba2K27ShotProfile(Guid.NewGuid(), "CurvedFixture", 83, 91, "Base", "Upper 1", "Upper 2", true, "Push");
         var detector = new ScriptedDetector();
-        using var predictor = new NbaMeterPredictor(profile, new() { CalibrationTrial = true, HoldMs = 0, TargetProgress = .75 },
+        using var predictor = new NbaMeterPredictor(profile, new() { Trigger = "physicalStick", CalibrationTrial = true, HoldMs = 0, TargetProgress = .75 },
             VisionSettings.Default with { MinimumConfidence = .65, MaximumUncertaintyMs = 18 }, detector);
         byte[] pixels = new byte[100 * 100 * 4];
         // A synthetic accelerating meter reaches 0.75 at t = 340 ms.
@@ -223,7 +223,7 @@ internal static class MeterContinuityChecks
     {
         var profile = new Nba2K27ShotProfile(Guid.NewGuid(), "RecoveryFixture", 83, 91, "Base", "Upper 1", "Upper 2", true, "Push");
         var detector = new ScriptedDetector();
-        using var predictor = new NbaMeterPredictor(profile, new() { CalibrationTrial = true, HoldMs = 0, TargetProgress = .75 },
+        using var predictor = new NbaMeterPredictor(profile, new() { Trigger = "physicalStick", CalibrationTrial = true, HoldMs = 0, TargetProgress = .75 },
             VisionSettings.Default with { MinimumConfidence = .65, MaximumUncertaintyMs = 15 }, detector);
         byte[] pixels = new byte[100 * 100 * 4];
         VisionSignalObservation Step(int ms, NbaMeterDetector.Measurement? m)
@@ -245,7 +245,7 @@ internal static class MeterContinuityChecks
         Check(forecast.TimeToTargetMs.HasValue && !forecast.InvalidateAttempt, "Real meter could not forecast after weak false-lock recovery.");
 
         // Also test direct jump from weak false lock (conf=0.67) to high-confidence real meter (conf=0.92).
-        using var direct = new NbaMeterPredictor(profile, new() { CalibrationTrial = true, HoldMs = 0, TargetProgress = .75 },
+        using var direct = new NbaMeterPredictor(profile, new() { Trigger = "physicalStick", CalibrationTrial = true, HoldMs = 0, TargetProgress = .75 },
             VisionSettings.Default with { MinimumConfidence = .65, MaximumUncertaintyMs = 15 }, detector);
         detector.Next = new(new(.4, .7, .03, .1), .40, .67, 110, 40, 70);
         Check(!direct.Observe(pixels, 100, 100, 400, 1, 1, Fixture.Ticks(80),
@@ -296,7 +296,7 @@ internal static class MeterContinuityChecks
     {
         var profile = new Nba2K27ShotProfile(Guid.NewGuid(), "DelayedFixture", 83, 91, "Base", "Upper 1", "Upper 2", true, "Push");
         var detector = new ScriptedDetector();
-        using var predictor = new NbaMeterPredictor(profile, new() { CalibrationTrial = true, HoldMs = 70, TargetProgress = .75 },
+        using var predictor = new NbaMeterPredictor(profile, new() { Trigger = "physicalStick", CalibrationTrial = true, HoldMs = 70, TargetProgress = .75 },
             VisionSettings.Default with { MinimumConfidence = .65, MaximumUncertaintyMs = 15 }, detector);
         byte[] pixels = new byte[100 * 100 * 4];
         VisionSignalObservation Step(int ms, double? progress)
@@ -380,7 +380,7 @@ internal static class MeterContinuityChecks
         internal Fixture(double holdMs = 0, double minimumConfidence = .65)
         {
             var profile = new Nba2K27ShotProfile(Guid.NewGuid(), "Fixture", 83, 91, "Base", "Upper 1", "Upper 2", true, "Push");
-            _predictor = new(profile, new() { CalibrationTrial = true, HoldMs = holdMs },
+            _predictor = new(profile, new() { Trigger = "physicalStick", CalibrationTrial = true, HoldMs = holdMs },
                 VisionSettings.Default with { MinimumConfidence = minimumConfidence, MaximumUncertaintyMs = 12 }, _detector);
         }
         internal static long Ticks(int ms) => Stopwatch.Frequency * 2 + (long)(ms * Stopwatch.Frequency / 1000d);

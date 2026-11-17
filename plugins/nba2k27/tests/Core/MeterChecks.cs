@@ -155,7 +155,7 @@ internal static class MeterChecks
     internal static void Calibration()
     {
         var p = new Nba2K27ShotProfile(Guid.NewGuid(), "Fixture", 83, 91, "Base", "Upper 1", "Upper 2", true, "Push");
-        var config = new NbaMeterSettings { Enabled = true, GameBuild = "2.0.0.12", CalibrationTrial = true };
+        var config = new NbaMeterSettings { Trigger = "physicalStick", Enabled = true, GameBuild = "2.0.0.12", CalibrationTrial = true };
         var settings = VisionSettings.Default with { CaptureSourceKey = "fixture-source" };
         string run = Guid.NewGuid().ToString("N");
         var observation = new VisionSignalObservation(1, 200, true, new(.2,.2,.1,.3), .8, 1, .002, 100, .9, 2, "fixture", CaptureWidth: 1280, CaptureHeight: 720);
@@ -232,6 +232,11 @@ internal static class MeterChecks
         if (Math.Abs(secondShot.Height - firstShot.Height) > firstShot.Height * .10)
             throw new Exception($"Between-shot Reset drifted meter height ({firstShot.Height:F1} -> {secondShot.Height:F1}).");
         empty.ResetSession();
+        if (NbaMeterSettings.Read(VisionSettings.Default).Trigger != "largeRight"
+            || NbaMeterSettings.Parse(JsonSerializer.SerializeToElement(new { confirmed = false })).Trigger != "largeRight"
+            || NbaMeterSettings.Parse(JsonSerializer.SerializeToElement(new { confirmed = true })).Trigger != "physicalStick"
+            || NbaMeterSettings.Parse(JsonSerializer.SerializeToElement(new { confirmed = true, trigger = "smallLeft" })).Trigger != "smallLeft")
+            throw new Exception("Fresh or saved rhythm trigger selected the wrong input.");
         var paddleSettings = config with { Trigger = "largeRight" };
         paddleSettings.Validate();
         if (paddleSettings.Action(p, settings).TriggerPaddle != PaddleButtons.LargeRight)

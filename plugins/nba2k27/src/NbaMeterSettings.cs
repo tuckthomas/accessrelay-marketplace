@@ -12,7 +12,7 @@ internal sealed record NbaMeterSettings
     public int Version { get; init; } = 1;
     public bool Enabled { get; init; }
     public string InputMode { get; init; } = "rhythm";
-    public string Trigger { get; init; } = "physicalStick";
+    public string Trigger { get; init; } = "largeRight";
     public string Style { get; init; } = "curved";
     public VisionCrop Viewport { get; init; } = new(0, 0, 1, 1);
     public int TargetRed { get; init; } = 80;
@@ -35,7 +35,15 @@ internal sealed record NbaMeterSettings
     public NbaMeterCalibrationResult[] Results { get; init; } = [];
     internal static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { UnmappedMemberHandling = System.Text.Json.Serialization.JsonUnmappedMemberHandling.Disallow };
     internal static NbaMeterSettings Read(VisionSettings settings) => settings.PluginAssistance is { } data
-        ? data.Deserialize<NbaMeterSettings>(Json) ?? throw new InvalidDataException("Meter settings are empty.") : new();
+        ? Parse(data) : new();
+
+    internal static NbaMeterSettings Parse(JsonElement data)
+    {
+        var meter = data.Deserialize<NbaMeterSettings>(Json) ?? throw new InvalidDataException("Meter settings are empty.");
+        // Before paddle selection existed, confirmed profiles calibrated a physical stick hold.
+        return meter.Confirmed && !data.EnumerateObject().Any(p => p.Name.Equals("trigger", StringComparison.OrdinalIgnoreCase))
+            ? meter with { Trigger = "physicalStick" } : meter;
+    }
     internal JsonElement Export() => JsonSerializer.SerializeToElement(this, Json);
     internal void Validate()
     {
