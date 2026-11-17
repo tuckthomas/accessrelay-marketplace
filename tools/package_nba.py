@@ -48,7 +48,7 @@ for file in sorted((PLUGIN / 'notices').glob('*')): add(file, 'data/' + file.nam
 cover_source = next((p for p in [PLUGIN / 'cover.jpg', PLUGIN / 'cover.jpeg', PLUGIN / 'cover.png', PLUGIN / 'cover.webp'] if p.is_file()), None)
 cover_entry = add(cover_source, 'data/cover' + cover_source.suffix.lower(), 'data') if cover_source else None
 cache = (args.model_cache or sdk / 'artifacts/AutoCaptureModels').resolve()
-legacy_cache = ROOT / 'packages/nba2k27-training/1.2.18/capture-models'
+legacy_cache = ROOT / 'packages/nba2k27/2.1.0/capture-models'
 expected = {
     'pose.onnx': '20aad6e2e42359cac1c5b4a0b2da00e29bfe91a72a782fdcf287d273a04c1b24',
     'text-det.onnx': 'ea07c15d38ac40cd69da3c493444ec75b44ff23840553ff8ba102c1219ed39c2',

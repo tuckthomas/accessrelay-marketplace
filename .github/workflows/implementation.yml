@@ -36,7 +36,7 @@ jobs:
       - run: python tools/validate.py
       - run: dotnet run --project plugins/nba2k27/tests/Core/PluginVerification.csproj -c Release
       - run: pnpm --dir plugins/nba2k27 test
-      - run: dotnet run --project ../AccessRelayStudio-Source/src/AccessRelayStudio/Verification/Verification.csproj -c Release -- --installed-plugin packages/nba2k27/2.1.0/pack.json artifacts/loader
+      - run: dotnet run --project ../AccessRelayStudio-Source/src/AccessRelayStudio/Verification/Verification.csproj -c Release -- --installed-plugin packages/nba2k27/2.1.1/pack.json artifacts/loader
       - run: python -S -m unittest discover -s plugins/nba2k27/tests/python -p 'test_*.py' -v
       - run: dotnet build plugins/nba2k27/tests/Windows/PluginWindowsVerification.csproj -c Release
       - run: dotnet run --project plugins/nba2k27/tests/Assistant/PluginAssistantVerification.csproj -c Release -- --python (Get-Command python).Source

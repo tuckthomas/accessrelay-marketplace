@@ -392,4 +392,29 @@ describe('meter calibration workflow', () => {
     fireEvent.click(screen.getByText('Advanced settings'));
     expect((screen.getByRole('spinbutton', { name: 'Timing correction · ms' }) as HTMLInputElement).value).toBe('22');
   });
+
+  it('starts capture and assistance in one click without requiring Start preview first', async () => {
+    const command = vi.fn().mockResolvedValue(null);
+    const state = fixture({
+      assistance: { key: 'current-setup', accepted: true, successfulTrials: 3, currentResults: [] },
+      status: { session: { running: false, canArm: false }, controllerConnection: { connected: true, inputConnected: true }, output: { armed: false } }
+    });
+    render(<Workspace mode="live" state={state} status={state.status} command={command} />);
+    const startButton = screen.getByRole('button', { name: 'Start assistance' }) as HTMLButtonElement;
+    expect(startButton.disabled).toBe(false);
+    fireEvent.click(startButton);
+    await waitFor(() => expect(command).toHaveBeenCalledWith('start', { loadModel: true, armed: true }));
+    expect(command.mock.calls.map(([a]) => a)).toEqual(['start']);
+  });
+
+  it('shows plain-English explanations on hover for advanced timing and detection settings', () => {
+    const command = vi.fn().mockResolvedValue(null), state = fixture();
+    render(<Workspace mode="live" state={state} status={state.status} command={command} />);
+    fireEvent.click(screen.getByText('Advanced settings'));
+    const infoButton = screen.getByRole('button', { name: 'About Timing correction · ms' });
+    fireEvent.mouseEnter(infoButton);
+    expect(screen.getByRole('tooltip').textContent).toContain('Negative values');
+    fireEvent.mouseLeave(infoButton);
+    expect(screen.queryByRole('tooltip')).toBeNull();
+  });
 });

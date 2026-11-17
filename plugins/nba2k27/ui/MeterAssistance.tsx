@@ -187,9 +187,25 @@ export function MeterAssistance({ state = {}, status, command, captureWindow, ed
   async function begin() {
     setSavedResult('');
     const operation = startOperation();
-    trial.current = operation.trial; operation.trial.active = !accepted; operation.armAttempted = true;
+    trial.current = operation.trial; operation.trial.active = !accepted;
     try {
-      await run('armedSet', { armed: true });
+      if (prepare) {
+        const next = { ...config, calibrationTrial: !accepted };
+        await run('signalConfigure', { ...meterArguments(next, timing), restart: !!session.running });
+        if (!currentStart(operation)) return;
+        setConfig(next); setDirty(false);
+        if (savedResult) setResultMessage('Result saved. Timing settings applied for the next trial. Start the next practice trial when ready.');
+        setAdjustmentFailed(false);
+      }
+      if (!session.running || session.modelReady === false) {
+        if (session.running && !prepare) await run('stop');
+        if (!currentStart(operation)) return;
+        operation.armAttempted = true;
+        await run('start', { loadModel: true, armed: true });
+      } else {
+        operation.armAttempted = true;
+        await run('armedSet', { armed: true });
+      }
       if (!currentStart(operation)) await cleanupStart(operation, true);
     } catch { await cleanupStart(operation, true); }
     finally { if (starting.current === operation) starting.current = null; }
@@ -260,19 +276,21 @@ export function MeterAssistance({ state = {}, status, command, captureWindow, ed
       await save({ ...config, calibrationTrial: false }, true);
     } catch { /* shown beside actions */ }
   }
-  const ready = session.running && session.canArm && connected && !inputMissing && !dirty && !s.stopping;
-  const prepare = session.running && !accepted && (!saved.pluginAssistance?.calibrationTrial
+  const prepare = !accepted && (!saved.pluginAssistance?.calibrationTrial
     || (saved.pluginAssistance?.targetProgress != null && saved.pluginAssistance.targetProgress !== config.targetProgress));
+  const ready = !!profile?.usesShotMeter && !!source && connected && !inputMissing && !dirty && !s.stopping && !(session.running && session.sourceStale)
+    && (!session.running || session.canArm || prepare);
   const nextStep = !profile ? 'Choose your shot profile.' : !profile.usesShotMeter ? 'Enable the shot meter in this profile and in NBA 2K27.'
-    : !source ? 'Choose the Remote Play window above.' : !session.running ? 'Start the preview to check your gameplay.'
+    : !source ? 'Choose the Remote Play window above.'
     : session.sourceStale ? 'Resume the Remote Play stream in your browser.' : inputMissing ? 'Connect your physical controller.'
     : dirty ? 'Apply or discard your settings changes before starting a trial.'
-    : !connected ? 'Connect controller output below.' : prepare ? 'Prepare the preview for practice calibration.'
+    : !connected ? 'Connect controller output below.'
+    : !session.running ? (accepted ? 'Start assistance to begin capture and automatic reversal.' : 'Start a practice trial to begin capture and one automatic reversal.')
     : !accepted && successes >= 3 ? matching ? 'Three matching results are saved. Save this calibration to continue.' : 'Complete a trial in this session to confirm your saved results.'
-    : !session.canArm ? session.message || 'Waiting for live capture.' : accepted
+    : !session.canArm && !prepare ? session.message || 'Waiting for live capture.' : accepted
       ? 'Start assistance to enable automatic reversal.' : 'Start a practice trial to enable one automatic reversal.';
-  function number(label: string, key: string, min: number, max: number, step = 1) {
-    return <Field key={key} label={label}><Input type="number" min={min} max={max} step={step} value={config[key]}
+  function number(label: string, key: string, min: number, max: number, step = 1, info?: string) {
+    return <Field key={key} label={label} info={info}><Input type="number" min={min} max={max} step={step} value={config[key]}
       disabled={working || !!output.armed} onChange={e => edit(key, e.target.value === '' ? NaN : +e.target.value)} /></Field>;
   }
   return <div className="page-stack meter-workflow"><style>{styles}</style>
@@ -303,7 +321,7 @@ export function MeterAssistance({ state = {}, status, command, captureWindow, ed
               : signal.invalidateAttempt ? 'Attempt cancelled' : signal.timeToTargetMs != null ? output.armed ? 'Live forecast' : 'Observation only — assistance off' : 'Observing'],
             ['Uncertainty', signal.continueCommittedAction ? '—' : `${fmt(signal.uncertaintyMs)} ms`], ['Processing', `${fmt(signal.processingMs, 2)} ms`], ['Geometry score', fmt(signal.confidence, 2)]].map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}</div></details>
         <details className="meter-diagnostics"><summary>Diagnostic recording</summary><div className="stack" style={{ marginTop: '12px' }}>
-          <p className="subtle" style={{ margin: 0 }}>Save gameplay frames and detection telemetry for up to 15 seconds. {output.armed
+          <p className="subtle" style={{ margin: 0 }}>Save gameplay frames and detection telemetry continuously until you stop recording. {output.armed
             ? accepted
               ? 'Automatic reversal is on; recording captures your live assisted shots.'
               : 'Automatic reversal is on for one practice shot.'
@@ -334,9 +352,9 @@ export function MeterAssistance({ state = {}, status, command, captureWindow, ed
             : 'Take one stationary shot. Hold the right stick down through the automatic reversal, then return to neutral.'}</Notice>
           {output.message && <p role="status">{output.message}</p>}
           <Button active={true} onClick={() => void pauseAssistance()}>Pause {accepted ? 'assistance' : 'trial'}</Button></div>
-          : !awaitingFeedback && (accepted || successes < 3 || !matching) && <Button active={false} className="meter-primary" disabled={working || (prepare ? !connected || dirty : !ready)} busy={busy === 'armedSet'}
-            onClick={() => { if (prepare) { void save({ ...config, calibrationTrial: true }, true).catch(() => {}); } else void begin(); }}>
-            <Icon name="play" size={18} />{prepare ? 'Prepare calibration' : accepted ? 'Start assistance' : 'Start practice trial'}</Button>}
+          : !awaitingFeedback && (accepted || successes < 3 || !matching) && <Button active={false} className="meter-primary" disabled={working || !ready} busy={busy === 'start' || busy === 'armedSet' || busy === 'signalConfigure'}
+            onClick={() => void begin()}>
+            <Icon name="play" size={18} />{accepted ? 'Start assistance' : 'Start practice trial'}</Button>}
         {!accepted && <>
           <div className="meter-progress" aria-label={`${successes} of 3 matching Excellent results`}><strong>{successes} of 3</strong><span>matching Excellent results</span></div>
           {awaitingFeedback ? <div className="meter-feedback"><h3>What did NBA 2K27 report?</h3><p className="subtle">{config.inputMode === 'rhythm'
@@ -367,23 +385,38 @@ export function MeterAssistance({ state = {}, status, command, captureWindow, ed
       </Card>
     </div>
     <details className="meter-advanced"><summary>Advanced settings</summary><Card title="Timing & detection">
-      <div className="form-grid"><Field label="Game build"><Input value={config.gameBuild} maxLength={80} disabled={working || !!output.armed} onChange={e => edit('gameBuild', e.target.value)} /></Field>
-        {number('Stroke duration · ms', 'strokeDurationMs', 8, 500)}
-        {number('Timing anchor · axis fraction', 'anchorFraction', 0, 1, .05)}{number('Full-up hold · ms', 'upHoldMs', 0, 500)}
-        {number('Hold qualification · ms', 'holdMs', 0, 250)}{number('Target fill', 'targetProgress', .7, 1.1, .01)}
-        <Field label="Stroke curve"><Select value={config.smoothStroke ? 'smooth' : 'linear'} disabled={working || !!output.armed} onValueChange={v => edit('smoothStroke', v === 'smooth')}>
+      <div className="form-grid"><Field label="Game build" info="Tracks the NBA 2K27 patch version for this calibration so results are kept separate across game updates."><Input value={config.gameBuild} maxLength={80} disabled={working || !!output.armed} onChange={e => edit('gameBuild', e.target.value)} /></Field>
+        {number('Stroke duration · ms', 'strokeDurationMs', 8, 500, 1, 'How fast the virtual right stick flips from down to up for a rhythm shot. Lower = faster tempo; higher = slower tempo.')}
+        {number('Timing anchor · axis fraction', 'anchorFraction', 0, 1, .05, 'Point along the stick flip that counts as your release timing point (0.5 = center crossing; 0.85 = near full-up).')}
+        {number('Full-up hold · ms', 'upHoldMs', 0, 500, 1, 'How long the virtual stick stays held at full-up after flipping so NBA 2K27 reliably registers the finish.')}
+        {number('Hold qualification · ms', 'holdMs', 0, 250, 1, 'How long you must hold the shoot button or paddle before meter tracking locks onto a shot. Prevents quick accidental taps from firing.')}
+        {number('Target fill', 'targetProgress', .7, 1.1, .01, 'How full the shot meter reaches (for example, 0.75 = 75%) before triggering the reversal so it finishes inside the green window after stream delay.')}
+        <Field label="Stroke curve" info="How the stick moves during the flip. Linear moves at constant speed; Smooth eases in and out like a thumbstick motion."><Select value={config.smoothStroke ? 'smooth' : 'linear'} disabled={working || !!output.armed} onValueChange={v => edit('smoothStroke', v === 'smooth')}>
           <SelectOption value="linear">Linear</SelectOption><SelectOption value="smooth">Smooth</SelectOption></Select></Field>
-        {(['estimatedVideoDelayMs', 'estimatedInputDelayMs', 'correctionMs', 'maximumUncertaintyMs', 'minimumConfidence'] as const).map((key, i) => <Field key={key}
-          label={['Video delay estimate · ms', 'Input delay estimate · ms', 'Timing correction · ms', 'Maximum uncertainty · ms', 'Minimum geometry score'][i]}>
+        {([
+          ['estimatedVideoDelayMs', 'Video delay estimate · ms', 'Estimated time between NBA 2K27 rendering a frame on Xbox and it appearing on your PC screen (typically 50–80 ms on Remote Play).'],
+          ['estimatedInputDelayMs', 'Input delay estimate · ms', 'Estimated time for a virtual controller command from Studio to reach NBA 2K27 over Remote Play (typically 10–25 ms).'],
+          ['correctionMs', 'Timing correction · ms', 'Fine-tune release offset in milliseconds. Negative values (for example, -5) release earlier to fix Late; positive values release later to fix Early.'],
+          ['maximumUncertaintyMs', 'Maximum uncertainty · ms', 'Largest prediction error in milliseconds allowed before releasing. Lower is stricter; higher tolerates noisier streams.'],
+          ['minimumConfidence', 'Minimum geometry score', 'Minimum visual match score (0–1) needed to trust that the detected bar on screen is actually the NBA 2K27 shot meter.']
+        ] as const).map(([key, label, info]) => <Field key={key} label={label} info={info}>
           <Input type="number" min={key === 'correctionMs' ? -1000 : 0} max={key === 'minimumConfidence' ? 1 : 1000} step={key === 'minimumConfidence' ? .05 : 1}
             value={timing[key] ?? 0} disabled={working || !!output.armed} onChange={e => editTiming(key, e.target.value === '' ? NaN : +e.target.value)} /></Field>)}
-        {config.inputMode === 'button' && <Field label="Shoot button"><Select value={timing.shootButton ?? 'x'} disabled={working || !!output.armed}
+        {config.inputMode === 'button' && <Field label="Shoot button" info="Xbox controller button Studio holds and releases when Shooting input is set to Shoot button."><Select value={timing.shootButton ?? 'x'} disabled={working || !!output.armed}
           onValueChange={v => { setTiming((old: any) => ({ ...old, shootButton: v })); setDirty(true); }}>{[['x','X'],['y','Y'],['a','A'],['b','B'],['leftBumper','LB'],['rightBumper','RB']].map(([value,label]) => <SelectOption key={value} value={value}>{label}</SelectOption>)}</Select></Field>}
       </div><p className="subtle">A 0.5 timing anchor is the neutral crossing. Negative timing correction sends earlier; positive sends later. Applying changes pauses assistance and resumes the preview.</p>
       <details><summary>Meter appearance & gameplay viewport</summary><div className="form-grid">
-        {number('Acquisition window · ms', 'acquisitionWindowMs', 100, 3000)}{number('Target red', 'targetRed', 0, 255)}{number('Target green', 'targetGreen', 0, 255)}
-        {number('Target blue', 'targetBlue', 0, 255)}{number('Hue tolerance · degrees', 'colorToleranceDegrees', 5, 60)}
-        {['left', 'top', 'width', 'height'].map(key => <Field key={key} label={`Gameplay ${key} · fraction`}><Input type="number" min={0} max={1} step={.01} value={config.viewport[key]}
+        {number('Acquisition window · ms', 'acquisitionWindowMs', 100, 3000, 1, 'Maximum time after pressing shot input that Studio keeps scanning for the shot meter to appear.')}
+        {number('Target red', 'targetRed', 0, 255, 1, 'Expected red channel (0–255) of the shot meter bar color used for visual matching.')}
+        {number('Target green', 'targetGreen', 0, 255, 1, 'Expected green channel (0–255) of the shot meter bar color used for visual matching.')}
+        {number('Target blue', 'targetBlue', 0, 255, 1, 'Expected blue channel (0–255) of the shot meter bar color used for visual matching.')}
+        {number('Hue tolerance · degrees', 'colorToleranceDegrees', 5, 60, 1, 'How far (in hue degrees) pixels may differ from the target meter color and still count. Higher handles dimmer courts; lower rejects background noise.')}
+        {([
+          ['left', 'Left edge of the gameplay area inside the captured window (0–1 fraction) so black bars or browser tabs are ignored.'],
+          ['top', 'Top edge of the gameplay area inside the captured window (0–1 fraction) so title bars or browser chrome are ignored.'],
+          ['width', 'Width of the gameplay area inside the captured window (0–1 fraction).'],
+          ['height', 'Height of the gameplay area inside the captured window (0–1 fraction).']
+        ] as const).map(([key, info]) => <Field key={key} label={`Gameplay ${key} · fraction`} info={info}><Input type="number" min={0} max={1} step={.01} value={config.viewport[key]}
           disabled={working || !!output.armed} onChange={e => edit('viewport', { ...config.viewport, [key]: +e.target.value })} /></Field>)}</div></details>
       <div className="button-group"><Button variant="primary" disabled={working || !!output.armed || !profile || !dirty} busy={busy === 'signalConfigure'}
         onClick={() => { void save(config, true).catch(() => {}); }}>Apply settings</Button>{dirty && <Button disabled={working} onClick={() => {

@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "apiVersion": 2,
   "id": "nba2k27",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "name": "NBA 2K27",
   "description": "Unified NBA 2K27 add-on: live curved-meter assistance with RHYTHM/TIMING feedback, auto-OCR timing, animation model training, and Lua shot trainer.",
   "license": "0BSD; capture models Apache-2.0",
@@ -107,7 +107,7 @@
       "path": "runtime/accessrelay.nba2k27.dll",
       "kind": "runtime",
       "bytes": 144384,
-      "sha256": "d23e7e2398d86bceb90b1f781c9856f833417537898bd97955e07144ee7541bc"
+      "sha256": "897fadd7d26113919e102d5cb9d2608c9c68db26ef10aa77562f2b60b3c6a5c0"
     },
     {
       "path": "ui/ControllerTuning.js",
@@ -130,8 +130,8 @@
     {
       "path": "ui/MeterAssistance.js",
       "kind": "ui",
-      "bytes": 43453,
-      "sha256": "d7836a36cda67ef0a6efea9284726a8f7cec47a47353557436e5b871b640e30f"
+      "bytes": 47352,
+      "sha256": "0cad8e801b2980142f700c24b2a0d2d65e057dfc2521d694fa7b043cf19da6f1"
     },
     {
       "path": "ui/MeterCalibration.js",
@@ -263,7 +263,7 @@
       "path": "data/source.json",
       "kind": "data",
       "bytes": 3510,
-      "sha256": "9ac17f8722ac5bf7316c4a9c4dc304a9f71486dad1ba06857cc7fd177da6a162"
+      "sha256": "f15a7c63a53105eae616d5fae64e2991350d6eebef3fac48d9d40dd8796a74f8"
     }
   ],
   "bindings": [],

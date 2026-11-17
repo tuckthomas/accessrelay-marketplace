@@ -28,7 +28,7 @@
     "plugins/nba2k27/ui/ControllerTuning.tsx": "8c9e2e2362d78c9a6f12af5722a31cf7ac96ecb81cfd985af6a2c5e93f237038",
     "plugins/nba2k27/ui/host.ts": "ecd945653270633a9267d41475d04bb6e72b11a6d24c51fd0cd82a6532030ba3",
     "plugins/nba2k27/ui/index.ts": "5cb74d8c4a4c23e6bb49deccdd5bdceecf7249d23193a88d2b04cd5fd22ecfab",
-    "plugins/nba2k27/ui/MeterAssistance.tsx": "13f9dd69174550ad80f22849ecda581f332b38c06217b626d8cdffc3ee53f99c",
+    "plugins/nba2k27/ui/MeterAssistance.tsx": "de44bf3ff0801498b26c3597bfed238a5f7400d7b80708ecd07fe338c65c1e02",
     "plugins/nba2k27/ui/MeterCalibration.ts": "036509b9faf5b41c86c9e0720cc9dfec3b36b7868e7c03a1bff9cd2791ec47e7",
     "plugins/nba2k27/ui/VisionWorkspace.tsx": "fde14b0d65d8857ddd4aa1338097d53f5b25b37bd3bcc265df9c93fc6f4406e0"
   }
