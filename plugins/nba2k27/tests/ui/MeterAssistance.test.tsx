@@ -417,4 +417,25 @@ describe('meter calibration workflow', () => {
     fireEvent.mouseLeave(infoButton);
     expect(screen.queryByRole('tooltip')).toBeNull();
   });
+
+  it('displays live tempo correction and groups OCR shot feedback log by distance', () => {
+    const command = vi.fn().mockResolvedValue(null), state = fixture({
+      settings: { correctionMs: -10, tempoCorrectionMs: 4, shootButton: 'x', pluginAssistance: { enabled: true }, trainingCapture: {} },
+      status: {
+        ...fixture().status,
+        ocrFeedback: { message: 'OCR fast late: timing -10 → -12.5 ms; tempo 0 → +4 ms.', distance: '24 ft', coverage: 'Open', rawText: 'RHYTHM | 24 FT | OPEN | FAST | LATE' },
+        ocrHistory: [
+          { distance: '24 ft', timing: 'excellent', tempo: 'excellent' },
+          { distance: '24 ft', timing: 'late', tempo: 'fast' }
+        ],
+        ocrHistoryPath: 'C:/data/ShotFeedbackHistory.jsonl'
+      }
+    });
+    render(<Workspace mode="live" state={state} status={state.status} command={command} />);
+    expect(screen.getByText(/\[24 ft · Open\]/).textContent).toContain('24 ft · Open');
+    fireEvent.click(screen.getByText('Shot feedback log (2)'));
+    expect(screen.getByText(/24 ft: 2 shots · 1 excellent · 0 early · 1 late · 1 fast · 0 slow/)).toBeTruthy();
+    fireEvent.click(screen.getByText('Advanced settings'));
+    expect((screen.getByRole('spinbutton', { name: 'Tempo correction · ms' }) as HTMLInputElement).value).toBe('4');
+  });
 });

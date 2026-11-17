@@ -7,8 +7,9 @@ export const meterDefaults = { version: 1, enabled: true, inputMode: 'rhythm', t
   upHoldMs: 48, targetProgress: .75, smoothStroke: false, autoOcrTiming: true, calibrationTrial: false, confirmed: false, gameBuild: '', results: [], calibratedWidth: 0, calibratedHeight: 0 };
 export function meterArguments(configuration: any, settings: any) {
   return { configuration, videoDelayMs: settings.estimatedVideoDelayMs ?? 0, inputDelayMs: settings.estimatedInputDelayMs ?? 0,
-    correctionMs: settings.correctionMs ?? 0, minimumConfidence: settings.minimumConfidence ?? .65,
-    maximumUncertaintyMs: settings.maximumUncertaintyMs ?? 12, shootButton: settings.shootButton ?? 'x' };
+    correctionMs: settings.correctionMs ?? 0, tempoCorrectionMs: settings.tempoCorrectionMs ?? 0,
+    minimumConfidence: settings.minimumConfidence ?? .65, maximumUncertaintyMs: settings.maximumUncertaintyMs ?? 12,
+    shootButton: settings.shootButton ?? 'x' };
 }
 const fmt = (v: any, digits = 1) => typeof v === 'number' && Number.isFinite(v) ? v.toFixed(digits) : '—';
 const triggerLabels: Record<string, string> = { largeRight: 'P4 · Large right paddle', largeLeft: 'P3 · Large left paddle',
@@ -380,7 +381,21 @@ export function MeterAssistance({ state = {}, status, command, captureWindow, ed
           {!accepted && <label className="meter-ocr-toggle"><input type="checkbox" checked={autoSubmitPractice} disabled={working || config.autoOcrTiming === false}
             onChange={e => setAutoSubmitPractice(e.target.checked)} />
             <span>Auto-save OCR practice results &amp; re-arm</span></label>}
-          {ocr?.message && <p className="subtle" role="status">{ocr.message}{ocr.rawText ? ` (${ocr.rawText})` : ''}</p>}
+          {ocr?.message && <p className="subtle" role="status">{ocr.message}{ocr.distance || ocr.coverage ? ` [${[ocr.distance, ocr.coverage].filter(Boolean).join(' · ')}]` : ''}{ocr.rawText ? ` (${ocr.rawText})` : ''}</p>}
+          {Array.isArray(s.ocrHistory) && s.ocrHistory.length > 0 && <details className="meter-ocr-history"><summary>Shot feedback log ({s.ocrHistory.length})</summary>
+            <div className="meter-ocr-summary">{Object.entries(s.ocrHistory.reduce((acc: any, r: any) => {
+              const key = r.distance || 'Distance unknown';
+              const g = acc[key] ?? { total: 0, excellent: 0, early: 0, late: 0, fast: 0, slow: 0 };
+              g.total++;
+              if (r.timing === 'excellent') g.excellent++;
+              else if (r.timing === 'early' || r.timing === 'slightlyEarly') g.early++;
+              else if (r.timing === 'late' || r.timing === 'slightlyLate') g.late++;
+              if (r.tempo === 'fast' || r.tempo === 'slightlyFast') g.fast++;
+              else if (r.tempo === 'slow' || r.tempo === 'slightlySlow') g.slow++;
+              acc[key] = g;
+              return acc;
+            }, {})).map(([dist, g]: [string, any]) => <p key={dist} className="subtle">{dist}: {g.total} shots · {g.excellent} excellent · {g.early} early · {g.late} late · {g.fast} fast · {g.slow} slow</p>)}</div>
+            {s.ocrHistoryPath && <p className="subtle">Saved to {s.ocrHistoryPath}</p>}</details>}
         </div>
       </Card>
     </div>
@@ -397,10 +412,12 @@ export function MeterAssistance({ state = {}, status, command, captureWindow, ed
           ['estimatedVideoDelayMs', 'Video delay estimate · ms', 'Estimated time between NBA 2K27 rendering a frame on Xbox and it appearing on your PC screen (typically 50–80 ms on Remote Play).'],
           ['estimatedInputDelayMs', 'Input delay estimate · ms', 'Estimated time for a virtual controller command from Studio to reach NBA 2K27 over Remote Play (typically 10–25 ms).'],
           ['correctionMs', 'Timing correction · ms', 'Fine-tune release offset in milliseconds. Negative values (for example, -5) release earlier to fix Late; positive values release later to fix Early.'],
+          ['tempoCorrectionMs', 'Tempo correction · ms', 'Fine-tune live stick-flip duration offset in milliseconds. Positive values slow a Fast flip; negative values speed up a Slow flip.'],
           ['maximumUncertaintyMs', 'Maximum uncertainty · ms', 'Largest prediction error in milliseconds allowed before releasing. Lower is stricter; higher tolerates noisier streams.'],
           ['minimumConfidence', 'Minimum geometry score', 'Minimum visual match score (0–1) needed to trust that the detected bar on screen is actually the NBA 2K27 shot meter.']
         ] as const).map(([key, label, info]) => <Field key={key} label={label} info={info}>
-          <Input type="number" min={key === 'correctionMs' ? -1000 : 0} max={key === 'minimumConfidence' ? 1 : 1000} step={key === 'minimumConfidence' ? .05 : 1}
+          <Input type="number" min={key === 'correctionMs' ? -1000 : key === 'tempoCorrectionMs' ? -200 : 0}
+            max={key === 'minimumConfidence' ? 1 : key === 'tempoCorrectionMs' ? 200 : 1000} step={key === 'minimumConfidence' ? .05 : 1}
             value={timing[key] ?? 0} disabled={working || !!output.armed} onChange={e => editTiming(key, e.target.value === '' ? NaN : +e.target.value)} /></Field>)}
         {config.inputMode === 'button' && <Field label="Shoot button" info="Xbox controller button Studio holds and releases when Shooting input is set to Shoot button."><Select value={timing.shootButton ?? 'x'} disabled={working || !!output.armed}
           onValueChange={v => { setTiming((old: any) => ({ ...old, shootButton: v })); setDirty(true); }}>{[['x','X'],['y','Y'],['a','A'],['b','B'],['leftBumper','LB'],['rightBumper','RB']].map(([value,label]) => <SelectOption key={value} value={value}>{label}</SelectOption>)}</Select></Field>}
@@ -436,6 +453,6 @@ const styles = `
 .meter-diagnostics,.meter-advanced{border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:16px}.meter-diagnostics summary,.meter-advanced>summary{cursor:pointer;font-weight:600;font-size:14px}
 .meter-advanced[open]>summary{margin-bottom:16px}.meter-advanced>.card{border:0;padding:8px 0 0}.meter-readings{display:grid;grid-template-columns:repeat(auto-fit,minmax(115px,1fr));gap:12px;margin-top:16px}
 .meter-readings>div{display:grid;gap:6px}.meter-readings span{font-size:14px;color:var(--muted)}
-.meter-ocr-box{display:grid;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}.meter-ocr-toggle{display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer}.meter-ocr-box p{margin:0}
+.meter-ocr-box{display:grid;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}.meter-ocr-toggle{display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer}.meter-ocr-box p{margin:0}.meter-ocr-history summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--muted)}.meter-ocr-summary{display:grid;gap:4px;margin:6px 0}
 @media(max-width:1080px){.meter-layout{grid-template-columns:minmax(0,1fr)}}
 `;

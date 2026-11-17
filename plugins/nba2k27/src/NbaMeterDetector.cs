@@ -104,7 +104,7 @@ internal sealed class NbaMeterDetector(NbaMeterSettings settings) : INbaMeterDet
             caps.Add(new(left+sumX/tail*step,top+sumY/tail*step,Math.Sqrt(w*w+h*h),tail));
         }
         Measurement? best=null;double second=0;
-        bool hasReliablePrior = _previous is { } priorState && (priorState.Progress > .03 || priorState.Score >= .78);
+        bool hasReliablePrior = _previous is { } priorState && priorState.Progress > .03;
         foreach(var cap in caps.OrderByDescending(c=>c.Area).Take(24))
         {
             Measurement? candidate=null;
@@ -201,9 +201,24 @@ internal sealed class NbaMeterDetector(NbaMeterSettings settings) : INbaMeterDet
                 && Math.Max(middle.Luma,Math.Max(innerA.Luma,innerB.Luma))-Math.Min(middle.Luma,Math.Min(innerA.Luma,innerB.Luma))<18)supported++;
             total+=neutral*.2+contrast*.3+Math.Clamp(Math.Min(rimSepA,rimSepB)/50,0,1)*.5;
         }
+        // Penalize candidates whose gray ribbon interior keeps running past t = 1.0 (truncated early fit).
+        int pastEndRibbon = 0;
+        for(int ext=1;ext<=3;ext++)
+        {
+            double t=1d+ext*.045,cx=x+bow*4*t*(1-t)+end*t,cy=y+h*t;
+            if(cy>=height-1)break;
+            double slope=(bow*4*(1-2*t)+end)/h,nx=1/Math.Sqrt(1+slope*slope),ny=-slope*nx;
+            var middle=Pixel(p,width,height,stride,cx,cy);
+            var innerA=Pixel(p,width,height,stride,cx-nx*w*.1,cy-ny*w*.1);
+            var innerB=Pixel(p,width,height,stride,cx+nx*w*.1,cy+ny*w*.1);
+            if(middle.Chroma<35 && innerA.Chroma<35 && innerB.Chroma<35
+                && Math.Min(middle.Luma,Math.Min(innerA.Luma,innerB.Luma))>70
+                && Math.Max(middle.Luma,Math.Max(innerA.Luma,innerB.Luma))-Math.Min(middle.Luma,Math.Min(innerA.Luma,innerB.Luma))<18)
+                pastEndRibbon++;
+        }
         // A ribbon has a flat neutral interior across its width. Poster/text strokes
         // below a green feedback box can otherwise achieve a plausible edge score.
-        return supported>=12 ? Math.Min(1,total/28*1.6*(supported>=14?1d:.88)) : 0;
+        return supported>=12 ? Math.Max(0, Math.Min(1,total/28*1.6*(supported>=14?1d:.88)) - pastEndRibbon*.08) : 0;
     }
     private double Progress(ReadOnlySpan<byte> p,int width,int height,int stride,Measurement meter)
     {
@@ -239,7 +254,9 @@ internal sealed class NbaMeterDetector(NbaMeterSettings settings) : INbaMeterDet
                 {int nx=xx+dx,ny=yy+dy;if(nx<0||nx>=columns||ny<0||ny>=rows)continue;int n=ny*columns+nx;if(_mask[n]){_mask[n]=false;_queue[tail++]=n;}}
             }
             // The detached horizontal tempo tick cannot satisfy the bottom-connected, vertical fill test.
-            if(top+maxY<meter.TargetY+meter.Height*.72 || maxY-minY<meter.Thickness*.8 || tail<5 || maxX-minX>meter.Height*.7)continue;
+            bool bottomAnchored = top+maxY>=meter.TargetY+meter.Height*.82 && maxX-minX<=meter.Thickness*2.2;
+            double minVerticalSpan = bottomAnchored ? Math.Max(3, meter.Thickness*.35) : meter.Thickness*.8;
+            if(top+maxY<meter.TargetY+meter.Height*.72 || maxY-minY<minVerticalSpan || tail<5 || maxX-minX>meter.Height*.7)continue;
             // The top tenth contains the colored cap and is excluded from this scan.
             // Fill reaches 100% at that measurable cap boundary, not inside the cap.
             if(tail>bestArea){bestArea=tail;progress=Math.Clamp((meter.TargetY+meter.Height-(top+minY))/(meter.Height*.9),0,1);}
