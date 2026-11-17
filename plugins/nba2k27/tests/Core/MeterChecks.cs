@@ -206,19 +206,24 @@ internal static class MeterChecks
         var empty = new NbaMeterDetector(new());
         for(int y=100;y<108;y++)for(int x=200;x<210;x++){int o=y*5120+x*4;frame[o+1]=220;}
         if(empty.Detect(frame,1280,720,5120) is not null) throw new Exception("A lone colored patch was mistaken for a meter.");
-        // Synthetic Small/zoomed meter (~90 px tall) beneath a wide cap (~14 px) whose coarse ratio (7.5x-13.5x) overestimates height:
-        byte[] refinedFrame = new byte[1280 * 720 * 4];
-        for (int y = 0; y < 720; y++) for (int x = 0; x < 1280; x++) { int o = y * 5120 + x * 4; refinedFrame[o] = 32; refinedFrame[o + 1] = 28; refinedFrame[o + 2] = 24; refinedFrame[o + 3] = 255; }
-        double mX = 640, mY = 260, trueH = 90, mBow = 18, mEnd = -6;
-        for (int dy = -3; dy <= 5; dy++) for (int dx = -7; dx <= 7; dx++) { int o = (int)(mY + dy) * 5120 + (int)(mX + dx) * 4; refinedFrame[o] = 40; refinedFrame[o + 1] = 220; refinedFrame[o + 2] = 40; }
-        for (double dh = 6; dh <= trueH; dh += 1)
+        // Synthetic meter session height persistence: after locking a 150 px meter cleanly on Shot 1,
+        // Reset() (between-shot release) retains session height while ResetSession() clears it:
+        byte[] sFrame = new byte[1280 * 720 * 4];
+        for (int y = 0; y < 720; y++) for (int x = 0; x < 1280; x++) { int o = y * 5120 + x * 4; sFrame[o] = 32; sFrame[o + 1] = 28; sFrame[o + 2] = 24; sFrame[o + 3] = 255; }
+        double mX = 640, mY = 240, trueH = 150, mBow = 30, mEnd = -12;
+        for (int dy = -5; dy <= 7; dy++) for (int dx = -8; dx <= 8; dx++) { int o = (int)(mY + dy) * 5120 + (int)(mX + dx) * 4; sFrame[o] = 40; sFrame[o + 1] = 220; sFrame[o + 2] = 40; }
+        for (double dh = 7; dh <= trueH; dh += 1)
         {
             double t = dh / trueH, cx = mX + mBow * 4 * t * (1 - t) + mEnd * t;
             byte lum = dh >= trueH * 0.55 ? (byte)195 : (byte)120;
-            for (int dx = -6; dx <= 6; dx++) { int o = (int)Math.Round(mY + dh) * 5120 + (int)Math.Round(cx + dx) * 4; refinedFrame[o] = lum; refinedFrame[o + 1] = lum; refinedFrame[o + 2] = lum; }
+            for (int dx = -7; dx <= 7; dx++) { int o = (int)Math.Round(mY + dh) * 5120 + (int)Math.Round(cx + dx) * 4; sFrame[o] = lum; sFrame[o + 1] = lum; sFrame[o + 2] = lum; }
         }
-        var refined = empty.Detect(refinedFrame, 1280, 720, 5120) ?? throw new Exception("Refined synthetic meter was not detected.");
-        if (Math.Abs(refined.Height - trueH) > 6) throw new Exception($"Bottom-border height refinement failed (expected ~{trueH}, got {refined.Height:F1}).");
+        var firstShot = empty.Detect(sFrame, 1280, 720, 5120) ?? throw new Exception("Synthetic meter was not detected.");
+        empty.Reset();
+        var secondShot = empty.Detect(sFrame, 1280, 720, 5120) ?? throw new Exception("Repeated shot meter was not detected.");
+        if (Math.Abs(secondShot.Height - firstShot.Height) > firstShot.Height * .10)
+            throw new Exception($"Between-shot Reset drifted meter height ({firstShot.Height:F1} -> {secondShot.Height:F1}).");
+        empty.ResetSession();
         var paddleSettings = config with { Trigger = "largeRight" };
         paddleSettings.Validate();
         if (paddleSettings.Action(p, settings).TriggerPaddle != PaddleButtons.LargeRight)

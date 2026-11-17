@@ -17,11 +17,12 @@ internal sealed class NbaMeterDetector(NbaMeterSettings settings) : INbaMeterDet
     private bool[] _mask = [];
     private int[] _queue = [];
     private Measurement? _previous;
-    private double _velocityX, _velocityY;
-    private int _emptyOutlineStreak;
+    private double _velocityX, _velocityY, _sessionHeight;
+    private int _emptyOutlineStreak, _sessionShiftCount;
     private readonly record struct Cap(double X, double Y, double Width, int Area);
     public bool Ambiguous { get; private set; }
     public void Reset() { _previous = null; _velocityX = _velocityY = 0; _emptyOutlineStreak = 0; Ambiguous = false; }
+    public void ResetSession() { Reset(); _sessionHeight = 0; _sessionShiftCount = 0; }
 
     public Measurement? Detect(ReadOnlySpan<byte> pixels, int width, int height, int stride)
     {
@@ -59,6 +60,21 @@ internal sealed class NbaMeterDetector(NbaMeterSettings settings) : INbaMeterDet
                     _velocityX = _velocityY = 0;
                 }
                 _previous = found;
+                if (found.Progress >= .25 && found.Score >= .80)
+                {
+                    if (_sessionHeight <= 0) { _sessionHeight = found.Height; _sessionShiftCount = 0; }
+                    else if (found.Height / _sessionHeight is > .80 and < 1.20)
+                    {
+                        _sessionHeight = _sessionHeight * .85 + found.Height * .15;
+                        _sessionShiftCount = 0;
+                    }
+                    else if (++_sessionShiftCount >= 3)
+                    {
+                        // Accept genuine camera/meter-size changes only after sustained confirmation.
+                        _sessionHeight = found.Height;
+                        _sessionShiftCount = 0;
+                    }
+                }
             }
         }
         else
@@ -116,6 +132,7 @@ internal sealed class NbaMeterDetector(NbaMeterSettings settings) : INbaMeterDet
                 double h=baseWidth*ratio;if(h<height*.035||h>height*.38||cap.Y+h>=height)continue;
                 double score=Score(pixels,width,height,stride,cap.X,cap.Y,h,side*bow*h,side*end*h,baseWidth);
                 if(hasReliablePrior && _previous is { } prior) score-=Math.Min(.18,Math.Abs(h/prior.Height-1)*.35);
+                else if(_sessionHeight>0 && h/_sessionHeight is > .80 and < 1.20) score-=Math.Min(.12,Math.Abs(h/_sessionHeight-1)*.30);
                 if(score>bestCoarse){bestCoarse=score;bestR=ratio;bestSide=side;bestBow=bow;bestEnd=end;}
             }
             bool nearPrevious = hasReliablePrior && _previous is { } trackedCap && Math.Abs(cap.X-trackedCap.TargetX)<width*.04 && Math.Abs(cap.Y-trackedCap.TargetY)<height*.04;
@@ -129,6 +146,7 @@ internal sealed class NbaMeterDetector(NbaMeterSettings settings) : INbaMeterDet
                     double h=baseWidth*ratio;if(h<height*.035||h>height*.38||cap.Y+h>=height)continue;
                     double score=Score(pixels,width,height,stride,cap.X,cap.Y,h,bestSide*bow*h,bestSide*end*h,baseWidth);
                     if(hasReliablePrior && _previous is { } prior) score-=Math.Min(.18,Math.Abs(h/prior.Height-1)*.35);
+                    else if(_sessionHeight>0 && h/_sessionHeight is > .80 and < 1.20) score-=Math.Min(.12,Math.Abs(h/_sessionHeight-1)*.30);
                     if(candidate is null||score>candidate.Value.Score)
                     {
                         double l=Math.Max(0,cap.X+Math.Min(0,bestSide*(bow+end)*h)-baseWidth-Math.Abs(end*h)),r=Math.Min(width,cap.X+Math.Max(0,bestSide*(bow+end)*h)+baseWidth+Math.Abs(end*h));
@@ -157,29 +175,17 @@ internal sealed class NbaMeterDetector(NbaMeterSettings settings) : INbaMeterDet
         }
         if(best is { } found && second>found.Score-.06){Ambiguous=true;return null;}
         if(best is not { } selected)return null;
-        double refinedH=RefineHeight(pixels,width,height,stride,selected);
-        if(Math.Abs(refinedH-selected.Height)>1.5)
+        double referenceHeight = hasReliablePrior && _previous is { } previous && Math.Abs(selected.TargetX - previous.TargetX) < width * .08 && Math.Abs(selected.TargetY - previous.TargetY) < height * .08
+            && selected.Height / previous.Height is > .75 and < 1.25
+            ? previous.Height
+            : (_sessionHeight > 0 && selected.Height / _sessionHeight is > .80 and < 1.20 ? _sessionHeight : 0);
+        if (referenceHeight > 0)
         {
-            double s=refinedH/selected.Height,refinedBow=selected.Bow*s*s,refinedEnd=4*selected.Bow*s*(1-s)+selected.End*s;
-            double refinedScore=Score(pixels,width,height,stride,selected.TargetX,selected.TargetY,refinedH,refinedBow,refinedEnd,selected.Thickness);
-            if(refinedScore>=.55)
-            {
-                double l=Math.Max(0,selected.TargetX+Math.Min(0,refinedBow+refinedEnd)-selected.Thickness-Math.Abs(refinedEnd));
-                double t=Math.Max(0,selected.TargetY-selected.Thickness);
-                double r=Math.Min(width,selected.TargetX+Math.Max(0,refinedBow+refinedEnd)+selected.Thickness+Math.Abs(refinedEnd));
-                double b=Math.Min(height,selected.TargetY+refinedH+selected.Thickness);
-                selected=selected with { Height=refinedH,Bow=refinedBow,End=refinedEnd,Score=refinedScore,
-                    Bounds=new(l/width,t/height,Math.Max(0,(r-l)/width),Math.Max(0,(b-t)/height)) };
-            }
-        }
-        if(hasReliablePrior && _previous is { } previous && Math.Abs(selected.TargetX-previous.TargetX)<width*.08 && Math.Abs(selected.TargetY-previous.TargetY)<height*.08
-            && selected.Height/previous.Height is > .75 and < 1.25)
-        {
-            // A one-pixel cap-edge change must not rescale the entire meter on every frame.
-            double stableHeight=previous.Height*.85+selected.Height*.15,scale=stableHeight/selected.Height;
-            double t=selected.Bounds.Top*height,b=Math.Min(height,selected.TargetY+stableHeight+selected.Thickness);
-            selected=selected with { Height=stableHeight, Bow=selected.Bow*scale,End=selected.End*scale,
-                Bounds=selected.Bounds with { Height=(b-t)/height } };
+            // A one-pixel cap-edge change must not rescale the entire meter on every frame or between shots.
+            double stableHeight = referenceHeight * .85 + selected.Height * .15, scale = stableHeight / selected.Height;
+            double t = selected.Bounds.Top * height, b = Math.Min(height, selected.TargetY + stableHeight + selected.Thickness);
+            selected = selected with { Height = stableHeight, Bow = selected.Bow * scale, End = selected.End * scale,
+                Bounds = selected.Bounds with { Height = (b - t) / height } };
         }
         return selected with { Progress = Progress(pixels,width,height,stride,selected) };
     }
@@ -277,59 +283,6 @@ internal sealed class NbaMeterDetector(NbaMeterSettings settings) : INbaMeterDet
             if(tail>bestArea){bestArea=tail;progress=Math.Clamp((meter.TargetY+meter.Height-(top+minY))/(meter.Height*.9),0,1);}
         }
         return progress;
-    }
-    private static double RefineHeight(ReadOnlySpan<byte> p,int width,int height,int stride,Measurement m)
-    {
-        double minDh=Math.Max(m.Thickness*4.5,m.Height*.50),maxDh=Math.Min(height-m.TargetY-2,m.Height*1.38);
-        double startDh=Math.Clamp(m.Thickness*4.0,m.Thickness*2.0,minDh),step=2.0,tStart=startDh/m.Height;
-        double cx=m.TargetX+m.Bow*4*tStart*(1-tStart)+m.End*tStart,lastValidDh=m.Height;
-        int gapCount=0,fillGapCount=0,maxGap=Math.Max(3,(int)Math.Ceiling(m.Thickness*.35/step));
-        double refLuma=0,peakFillLuma=0;int refN=0;bool sawBrightFill=false;
-        for(double t=.22;t<=.52;t+=.05)
-        {
-            double rx=m.TargetX+m.Bow*4*t*(1-t)+m.End*t;
-            var rp=Pixel(p,width,height,stride,rx,m.TargetY+m.Height*t);
-            if(rp.Chroma<35 && rp.Luma>65){refLuma+=rp.Luma;refN++;}
-        }
-        if(refN>0)refLuma/=refN;
-        double minInteriorLuma=Math.Max(65,Math.Min(110,refLuma*.72));
-        for(double dh=startDh;dh<=maxDh;dh+=step)
-        {
-            double t=dh/m.Height,slope=t<=1?(m.Bow*4*(1-2*t)+m.End)/m.Height:(m.End-4*m.Bow)/m.Height;
-            cx+=slope*step;
-            double cy=m.TargetY+dh,sumX=0,bestRowLuma=0,bestFillLuma=0;int insideCount=0,fillCount=0,halfW=Math.Max(2,(int)Math.Round(m.Thickness*.42));
-            for(int dx=-halfW;dx<=halfW;dx++)
-            {
-                var px=Pixel(p,width,height,stride,cx+dx,cy);
-                if(px.Chroma<35 && px.Luma>=minInteriorLuma){insideCount++;sumX+=cx+dx;if(px.Luma>bestRowLuma)bestRowLuma=px.Luma;}
-                if(px.Chroma<25 && px.Luma>=155){fillCount++;if(px.Luma>bestFillLuma)bestFillLuma=px.Luma;}
-            }
-            if(fillCount>=2){sawBrightFill=true;peakFillLuma=Math.Max(peakFillLuma,bestFillLuma);}
-            bool rawInterior=insideCount>=Math.Max(2,halfW/2),hasContrast=false;
-            if(rawInterior)
-            {
-                double nx=1/Math.Sqrt(1+slope*slope),ny=-slope*nx,midX=sumX/insideCount;
-                var outA=Pixel(p,width,height,stride,midX-nx*m.Thickness*.65,cy-ny*m.Thickness*.65);
-                var outB=Pixel(p,width,height,stride,midX+nx*m.Thickness*.65,cy+ny*m.Thickness*.65);
-                double sepA=Math.Max(Math.Abs(bestRowLuma-outA.Luma),(outA.Chroma-20)*.7);
-                double sepB=Math.Max(Math.Abs(bestRowLuma-outB.Luma),(outB.Chroma-20)*.7);
-                // Keep tracking through court lines crossing one edge; stop only when both flanks lose contrast.
-                hasContrast=dh<minDh || !(Math.Max(sepA,sepB)<18 || (bestRowLuma<160 && Math.Min(sepA,sepB)<8));
-                if(hasContrast)cx=cx*.4+midX*.6;
-            }
-            // The bright white fill runs continuously to the bottom border; a drop past it means we exited the meter.
-            if(sawBrightFill && dh>=minDh)
-            {
-                bool rowHasFill=fillCount>=2 && bestFillLuma>=Math.Max(148,peakFillLuma-34);
-                if(rowHasFill){lastValidDh=dh;fillGapCount=0;}
-                else if(++fillGapCount>=2)break;
-                continue;
-            }
-            if(rawInterior && hasContrast){if(dh>=minDh)lastValidDh=dh;gapCount=0;}
-            // Keep scanning while meter-width pixels continue through a crossing court stripe; stop only once pixels exit the meter.
-            else if(!rawInterior && dh>=minDh && ++gapCount>=maxGap)break;
-        }
-        return lastValidDh;
     }
     private static (double Luma,int Chroma) Pixel(ReadOnlySpan<byte> p,int width,int height,int stride,double x,double y)
     {

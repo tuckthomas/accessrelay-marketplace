@@ -186,7 +186,7 @@ internal sealed class NbaMeterPredictor(Nba2K27ShotProfile profile, NbaMeterSett
             if (double.IsFinite(_bestUncertainty)) return UnforecastedCompletion(meter, velocity);
             return Observation("The observed target has passed. Return to neutral.", meter, velocity, confidence, uncertainty, invalidate: _forecasted);
         }
-        double effectiveMaxUncertainty = tau > 140 ? Math.Min(settings.MaximumUncertaintyMs, 7.5) : settings.MaximumUncertaintyMs;
+        double effectiveMaxUncertainty = tau > 175 ? Math.Min(settings.MaximumUncertaintyMs, 8.5) : settings.MaximumUncertaintyMs;
         if (tau <= 400 && double.IsFinite(uncertainty))
         {
             _bestUncertainty = Math.Min(_bestUncertainty, uncertainty);
@@ -241,6 +241,6 @@ internal sealed class NbaMeterPredictor(Nba2K27ShotProfile profile, NbaMeterSett
         _bestUncertainty = double.PositiveInfinity;
         _detector.Reset();
     }
-    public void Reset() { ClearAttempt(); _held = false; _holdStart = _hostHoldStart = 0; }
+    public void Reset() { ClearAttempt(); _held = false; _holdStart = _hostHoldStart = 0; (_detector as NbaMeterDetector)?.ResetSession(); }
     public void Dispose() => Reset();
 }
