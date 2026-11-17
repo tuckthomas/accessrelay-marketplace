@@ -285,7 +285,7 @@ export function MeterAssistance({ state = {}, status, command, captureWindow, ed
   const ready = !!profile?.usesShotMeter && !!source && connected && !inputMissing && !dirty && !s.stopping && !(session.running && session.sourceStale)
     && (!session.running || session.canArm || prepare);
   const nextStep = !profile ? 'Choose your shot profile.' : !profile.usesShotMeter ? 'Enable the shot meter in this profile and in NBA 2K27.'
-    : !source ? 'Choose the Remote Play window above.'
+    : !source ? (s.xbox?.direct ? 'Connect your Xbox above.' : 'Choose the Remote Play window above.')
     : session.sourceStale ? 'Resume the Remote Play stream in your browser.' : inputMissing ? 'Connect your physical controller.'
     : dirty ? 'Apply or discard your settings changes before starting a trial.'
     : !connected ? 'Connect controller output below.'
@@ -314,7 +314,7 @@ export function MeterAssistance({ state = {}, status, command, captureWindow, ed
       <Button disabled={working} onClick={() => setCopying(false)}>Cancel</Button>
     </div>}{profile && <p className="subtle meter-profile-summary">{profile.cameraView} camera · {profile.meterReleaseType || 'Release cue not set'} · {profile.usesShotMeter ? 'Meter on' : 'Meter off'}</p>}
     {config.inputMode === 'rhythm' && (config.trigger ?? 'largeRight') !== 'physicalStick' && <p className="subtle meter-profile-summary">Map the selected paddle to its PC Profile Numpad key in Xbox Accessories. Hold the paddle with the physical right stick centered. Studio generates the full downstroke and upstroke.</p>}</Card>
-    <Card title="Xbox stream statistics" description="Enable the statistics overlay in Xbox Remote Play. Studio reads it in the background. Displayed ping or latency does not measure the full controller-to-screen delay.">
+    <Card title="Xbox stream statistics" description={s.xbox?.direct ? 'Studio reads network and decoder statistics from the active Xbox stream.' : 'Enable the statistics overlay in the Xbox app so Studio can read it during window capture.'}>
       <p role="status">{s.streamTelemetry?.message || 'Statistics will appear when gameplay capture starts.'}</p>
       {s.streamTelemetryReader && <p className="subtle">{s.streamTelemetryReader}</p>}
       <div className="meter-readings">{[[nativeStats?.rttSource === 'ICMP to selected LAN peer' ? 'LAN ping' : nativeStats ? 'ICE RTT' : 'Ping', nativeStats ? nativeStats.rttMs : streamStats?.pingMs, 'ms'], ['Jitter', streamStats?.jitterMs, 'ms'],
@@ -428,7 +428,7 @@ export function MeterAssistance({ state = {}, status, command, captureWindow, ed
           <SelectOption value="linear">Linear</SelectOption><SelectOption value="smooth">Smooth</SelectOption></Select></Field>
         {([
           ['estimatedVideoDelayMs', 'Video delay estimate · ms', 'Estimated time between NBA 2K27 rendering a frame on Xbox and it appearing on your PC screen (typically 50–80 ms on Remote Play).'],
-          ['estimatedInputDelayMs', 'Input delay estimate · ms', 'Estimated time for a virtual controller command from Studio to reach NBA 2K27 over Remote Play (typically 10–25 ms).'],
+          ['estimatedInputDelayMs', 'Input delay estimate · ms', 'Estimated time for a controller command from Studio to reach NBA 2K27 on this Remote Play setup.'],
           ['correctionMs', 'Timing correction · ms', 'Fine-tune release offset in milliseconds. Negative values (for example, -5) release earlier to fix Late; positive values release later to fix Early.'],
           ['tempoCorrectionMs', 'Tempo correction · ms', 'Fine-tune live stick-flip duration offset in milliseconds. Positive values slow a Fast flip; negative values speed up a Slow flip.'],
           ['maximumUncertaintyMs', 'Maximum uncertainty · ms', 'Largest prediction error in milliseconds allowed before releasing. Lower is stricter; higher tolerates noisier streams.'],
