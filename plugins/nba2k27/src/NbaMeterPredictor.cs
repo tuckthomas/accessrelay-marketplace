@@ -58,7 +58,7 @@ internal sealed class NbaMeterPredictor(Nba2K27ShotProfile profile, NbaMeterSett
         { ClearAttempt(); _holdStart = physicalStart > 0 ? physicalStart : captureTicks; _hostHoldStart = physicalStart; _held = true; }
         else if (physicalStart > 0 && _hostHoldStart == 0) _holdStart = _hostHoldStart = physicalStart;
         if (context.Armed && physicalStart == 0)
-            return Fail("Physical hold timing is unavailable. Return to neutral before the next attempt.");
+            return Fail("Shot trigger timing is unavailable. Release the trigger before the next attempt.");
         if (_attemptFailure is { } failure) return Observation(failure, invalidate: true);
         if (_hostShotToken > 0 && context.ShotToken == 0)
         {
@@ -70,8 +70,8 @@ internal sealed class NbaMeterPredictor(Nba2K27ShotProfile profile, NbaMeterSett
             return Fail("Frame cadence broke. Return to neutral before the next attempt.");
         _lastCapture = captureTicks;
         double heldMs = Math.Max(0, (captureTicks - _holdStart) * 1000d / Stopwatch.Frequency);
-        if (captureTicks < _holdStart || heldMs < configuration.HoldMs) return Observation("Qualifying the physical hold.");
-        if (heldMs > settings.MaximumShotDurationMs) return Fail("Shot expired. Return the stick or button to neutral before the next shot.");
+        if (captureTicks < _holdStart || heldMs < configuration.HoldMs) return Observation("Waiting for the shot trigger hold to qualify.");
+        if (heldMs > settings.MaximumShotDurationMs) return Fail("Shot expired. Release the shot trigger before the next shot.");
         if (!_acquired && heldMs > configuration.AcquisitionWindowMs + settings.EstimatedVideoDelayMs)
             return Fail("No new meter appeared inside the input acquisition window. Return to neutral.");
         bool anchored = context.StrokeAnchorTimestamp > 0 && captureTicks >= context.StrokeAnchorTimestamp;
