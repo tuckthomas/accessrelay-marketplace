@@ -1,0 +1,272 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "nba2k27",
+  "version": "2.1.9",
+  "name": "NBA 2K27",
+  "description": "Unified NBA 2K27 add-on: live curved-meter assistance with RHYTHM/TIMING feedback, auto-OCR timing, animation model training, and Lua shot trainer.",
+  "license": "0BSD; capture models Apache-2.0",
+  "gameId": "nba2k27",
+  "trainingAdapter": "nba2k27-training-v1",
+  "visionAdapter": "temporal-release-v1",
+  "runtime": {
+    "assembly": "runtime/accessrelay.nba2k27.dll",
+    "factory": "EliteScriptStudio.Packs.Nba2K27.NbaPluginFactory",
+    "uiEntry": "ui/index.js",
+    "trainingEntry": "training/Run-NbaTraining.py",
+    "modelDirectory": "capture-models",
+    "contractVersion": 5,
+    "auditEntry": "training/Audit-VisionDataset.py",
+    "experimentsEntry": "training/Run-VisionExperiments.py"
+  },
+  "controllerTrainer": {
+    "shots": [
+      {
+        "id": "standing-still",
+        "label": "Standing Still",
+        "instructions": "Stand still in your practice area and record one complete shot with the selected shot input."
+      },
+      {
+        "id": "off-dribble",
+        "label": "Off-Dribble",
+        "instructions": "Dribble manually into the shot and record the selected shot input. Movement and other controls remain live when you tap the assigned input to replay the shot."
+      },
+      {
+        "id": "fade-away",
+        "label": "Fade-Away",
+        "instructions": "Move into your fade-away manually and record the selected shot input. Use the same movement and animation when you practice its one-tap shot playback."
+      }
+    ],
+    "timingFeedback": [
+      {
+        "id": "none",
+        "label": "No timing feedback",
+        "adjustmentMs": 0
+      },
+      {
+        "id": "early",
+        "label": "Early",
+        "adjustmentMs": 16
+      },
+      {
+        "id": "slightly-early",
+        "label": "Slightly Early",
+        "adjustmentMs": 8
+      },
+      {
+        "id": "excellent",
+        "label": "Excellent",
+        "adjustmentMs": 0
+      },
+      {
+        "id": "slightly-late",
+        "label": "Slightly Late",
+        "adjustmentMs": -8
+      },
+      {
+        "id": "late",
+        "label": "Late",
+        "adjustmentMs": -16
+      }
+    ],
+    "tempoFeedback": [
+      {
+        "id": "none",
+        "label": "No tempo feedback",
+        "adjustmentMs": 0
+      },
+      {
+        "id": "fast",
+        "label": "Fast",
+        "adjustmentMs": 8
+      },
+      {
+        "id": "slightly-fast",
+        "label": "Slightly Fast",
+        "adjustmentMs": 4
+      },
+      {
+        "id": "excellent",
+        "label": "Excellent",
+        "adjustmentMs": 0
+      },
+      {
+        "id": "slightly-slow",
+        "label": "Slightly Slow",
+        "adjustmentMs": -4
+      },
+      {
+        "id": "slow",
+        "label": "Slow",
+        "adjustmentMs": -8
+      }
+    ]
+  },
+  "assets": [
+    {
+      "path": "runtime/accessrelay.nba2k27.dll",
+      "kind": "runtime",
+      "bytes": 178688,
+      "sha256": "9df78512116e1f148574f235bc1b315762a6875cd758da7f9b607f13fca8e0c4"
+    },
+    {
+      "path": "ui/ControllerTuning.js",
+      "kind": "ui",
+      "bytes": 2679,
+      "sha256": "1e84b24d387353529cfa79104544e75e447e03acbec5d30aced25f2b4f8bee98"
+    },
+    {
+      "path": "ui/MeterAssistance.js",
+      "kind": "ui",
+      "bytes": 54601,
+      "sha256": "a3435e6f74616afbefb1504d7c8b9cdc90aff27c0ca978412559b5661272a6ed"
+    },
+    {
+      "path": "ui/MeterCalibration.js",
+      "kind": "ui",
+      "bytes": 3866,
+      "sha256": "c9bea05a36204846a6cae736fe8325664095187bf6a0e809053307480d3a93f7"
+    },
+    {
+      "path": "ui/VisionWorkspace.js",
+      "kind": "ui",
+      "bytes": 98011,
+      "sha256": "8bbb2db41c201d4b18c69b6e6caa3e021c42cd16abca8e18efa5d0921840e566"
+    },
+    {
+      "path": "ui/host.js",
+      "kind": "ui",
+      "bytes": 1247,
+      "sha256": "d5c5fc4c7aa5861e41af86d21d4b5101c76bd4a0e3b9204addb3f9dcbc07013a"
+    },
+    {
+      "path": "ui/index.js",
+      "kind": "ui",
+      "bytes": 320,
+      "sha256": "c9402156ec18e2b460da9268b4ce9c8d24e4f591bbc0e8da596f6a1904320c6c"
+    },
+    {
+      "path": "training/Audit-VisionDataset.py",
+      "kind": "workflow",
+      "bytes": 3807,
+      "sha256": "558179bd20f5e4258349fc7c36b75cc0048805ea31f551f23cb16e1dbb0decc2"
+    },
+    {
+      "path": "training/Convert-VisionEvidence.py",
+      "kind": "workflow",
+      "bytes": 1543,
+      "sha256": "4498c7551a05a73915a34c0a5a6622a770d47fe93094505538d91e89178de59e"
+    },
+    {
+      "path": "training/Evaluate-VisionModel.py",
+      "kind": "workflow",
+      "bytes": 16123,
+      "sha256": "79e7f468bca9d29ae957a10405f34e7b2324d7a8d63ef3e345916392d0ec7387"
+    },
+    {
+      "path": "training/Run-NbaTraining.py",
+      "kind": "workflow",
+      "bytes": 9100,
+      "sha256": "51349e16aa4cc7a6bb75708dc0226b86ccc894528fc96898582c23fe090cb4a3"
+    },
+    {
+      "path": "training/Run-VisionExperiments.py",
+      "kind": "workflow",
+      "bytes": 8887,
+      "sha256": "8d12616eccf804d6b3db966686f463dd394869ec8bde8f45fadf5cdf7974bed1"
+    },
+    {
+      "path": "training/Train-VisionModel.py",
+      "kind": "workflow",
+      "bytes": 25518,
+      "sha256": "dee2b5cf799ee35f96f0a96dd8e48dd4d5071f847bbb4b7654199f65f31e3e7f"
+    },
+    {
+      "path": "training/dataset_provenance.py",
+      "kind": "workflow",
+      "bytes": 926,
+      "sha256": "71a2ffaac2ad3f9d7be91e243cd1d9d9d26d97dd458043b837ca37b6e259a815"
+    },
+    {
+      "path": "training/evidence_conversion.py",
+      "kind": "workflow",
+      "bytes": 32037,
+      "sha256": "5ea95f28cb0e354bdb6bcf5ce2b1f26c4aca56d126010dff11c5c614c492b42a"
+    },
+    {
+      "path": "training/experiment_metrics.py",
+      "kind": "workflow",
+      "bytes": 1696,
+      "sha256": "2e52f7d696dc001db2937a515157a50dee9b8f7e1cca700179640d637dfb1774"
+    },
+    {
+      "path": "training/footage_integrity.py",
+      "kind": "workflow",
+      "bytes": 5918,
+      "sha256": "3b3d4587d2a3a9227e8cba54e211ab7267caef78d0414cca8c02727b43dc5602"
+    },
+    {
+      "path": "training/temporal_experiments.py",
+      "kind": "workflow",
+      "bytes": 3426,
+      "sha256": "b98d650a2636f3ecb7463405765cad8bff0da57b13b3edf126e5427cca72aaee"
+    },
+    {
+      "path": "training/vision_preprocessing.py",
+      "kind": "workflow",
+      "bytes": 2150,
+      "sha256": "0f9f7b041685df96b596776211a93b7ece314412ade514a145daa54902e169f6"
+    },
+    {
+      "path": "data/capture-models-APACHE-2.0.txt",
+      "kind": "data",
+      "bytes": 11400,
+      "sha256": "aa2c6f3408169b96e5547c875deb481c91502514c1885fa0acb4b596c8909cb9"
+    },
+    {
+      "path": "data/capture-models-NOTICE.txt",
+      "kind": "data",
+      "bytes": 1541,
+      "sha256": "2ecd1cf4487309a304349150b9cb698a8cdb220d4a33bb8354dd95efdcdb0b0a"
+    },
+    {
+      "path": "data/capture-models.md",
+      "kind": "data",
+      "bytes": 2276,
+      "sha256": "a7b884a3a119eb45742fa8790cbcba3ab522530be253de66ad8c993119330057"
+    },
+    {
+      "path": "data/cover.jpg",
+      "kind": "data",
+      "bytes": 472554,
+      "sha256": "f0fc7d29e1acd004a1e15079b9470229cc2c24d521da35d39ec00d5e04f525de"
+    },
+    {
+      "path": "capture-models/pose.onnx",
+      "kind": "captureModel",
+      "bytes": 27342008,
+      "sha256": "20aad6e2e42359cac1c5b4a0b2da00e29bfe91a72a782fdcf287d273a04c1b24"
+    },
+    {
+      "path": "capture-models/text-det.onnx",
+      "kind": "captureModel",
+      "bytes": 2421707,
+      "sha256": "ea07c15d38ac40cd69da3c493444ec75b44ff23840553ff8ba102c1219ed39c2"
+    },
+    {
+      "path": "capture-models/text-rec.onnx",
+      "kind": "captureModel",
+      "bytes": 7653044,
+      "sha256": "e8770c967605983d1570cdf5352041dfb68fa0c21664f49f47b155abd3e0e318"
+    },
+    {
+      "path": "data/source.json",
+      "kind": "data",
+      "bytes": 3978,
+      "sha256": "d5a2e52e340f3fdc50f34d047a39e0c14c67b3c1c2abea433f84d7c3fa536b26"
+    }
+  ],
+  "bindings": [],
+  "tuning": [],
+  "presets": []
+}

@@ -33,8 +33,8 @@ describe('meter calibration workflow', () => {
     render(<Workspace mode="live" state={state} status={{ ...state.status,
       lastAction: { id: 2, runId: 'run', configurationKey: 'current-setup', eligibleForFeedback: true },
       lastAttempt: { id: 3, runId: 'run', outcome: 'cancelled', cancellationReason: 'Tracking lost' },
-      output: { armed: true, holdingCancelledPaddleShot: true } }} command={command} />);
-    expect(screen.getByText(/Release the paddle to return the stick to neutral/)).toBeTruthy();
+      output: { armed: true, holdingCancelledTriggerShot: true } }} command={command} />);
+    expect(screen.getByText(/Release the shot control to return the stick to neutral/)).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Save result' })).toBeNull();
     expect(command).not.toHaveBeenCalled();
   });
@@ -369,6 +369,16 @@ describe('meter calibration workflow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Pause trial' }));
     await waitFor(() => expect(command.mock.calls.some(([action]) => action === 'stop')).toBe(true));
     expect(screen.getByText(/Manual pause failed\./)).toBeTruthy();
+  });
+
+  it.each(['a', 'dPadLeft', 'leftTrigger', 'rightStick', 'leftDown'])('saves %s as the auto-green trigger', async trigger => {
+    const command = vi.fn().mockResolvedValue(null), state = fixture();
+    render(<Workspace mode="live" state={state} status={{ ...state.status, session: { running: false, canArm: true } }} command={command} />);
+    await selectValue(screen.getByRole('combobox', { name: 'Shot trigger' }), trigger);
+    fireEvent.click(screen.getByRole('button', { name: 'Start preview' }));
+    await waitFor(() => expect(command).toHaveBeenCalledWith('signalConfigure', expect.objectContaining({
+      configuration: expect.objectContaining({ trigger })
+    })));
   });
 
   it('defaults rhythm shots to a paddle trigger, guides centered right-stick play when armed, and lets users switch triggers', async () => {

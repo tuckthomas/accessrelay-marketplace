@@ -241,9 +241,17 @@ internal static class MeterChecks
             || NbaMeterSettings.Parse(JsonSerializer.SerializeToElement(new { confirmed = true })).Trigger != "physicalStick"
             || NbaMeterSettings.Parse(JsonSerializer.SerializeToElement(new { confirmed = true, trigger = "smallLeft" })).Trigger != "smallLeft")
             throw new Exception("Fresh or saved rhythm trigger selected the wrong input.");
+        foreach (var control in ControlMap.All)
+        {
+            string id = JsonNamingPolicy.CamelCase.ConvertName(control.ToString());
+            var binding = config with { Trigger = id };
+            binding.Validate();
+            if (binding.Action(p, settings).TriggerControl != control)
+                throw new Exception($"Shot control {id} did not round trip.");
+        }
         var paddleSettings = config with { Trigger = "largeRight" };
         paddleSettings.Validate();
-        if (paddleSettings.Action(p, settings).TriggerPaddle != PaddleButtons.LargeRight)
+        if (paddleSettings.Action(p, settings).TriggerControl != ControlId.LargeRight)
             throw new Exception("Paddle trigger did not map to LargeRight.");
         if (paddleSettings.Key(p, settings) == config.Key(p, settings))
             throw new Exception("Changing the shot trigger did not isolate calibration keys.");
@@ -251,12 +259,12 @@ internal static class MeterChecks
         using var paddlePredictor = ((IVisionCaptureProfile)p).CreateLivePredictor(settings with { PluginAssistance = paddleSettings.Export() })!;
         var idleObserve = paddlePredictor.Observe(frame, 1280, 720, 5120, 1, 1, Stopwatch.GetTimestamp(),
             new(default(ControllerState), Stopwatch.GetTimestamp(), 1, 0, 0, false));
-        if (idleObserve.Message != "Waiting for your paddle hold.")
+        if (idleObserve.Message != "Waiting for your assigned shot control.")
             throw new Exception("Paddle predictor did not wait for the configured paddle.");
         long holdTs = Stopwatch.GetTimestamp();
         var paddleObserve = paddlePredictor.Observe(frame, 1280, 720, 5120, 2, 1, holdTs,
             new(default(ControllerState), holdTs, 1, 1, holdTs, true) { HoldStartedTimestamp = holdTs, HeldPaddles = PaddleButtons.LargeRight });
-        if (paddleObserve.Message == "Waiting for your paddle hold.")
+        if (paddleObserve.Message == "Waiting for your assigned shot control.")
             throw new Exception("Paddle predictor ignored a held LargeRight paddle when the right stick stayed centered.");
         Console.WriteLine("SUCCESS Meter calibration: no tag/model prerequisite, native receipt provenance, duplicate/result/context/resolution guards and explicit confirmation.");
     }

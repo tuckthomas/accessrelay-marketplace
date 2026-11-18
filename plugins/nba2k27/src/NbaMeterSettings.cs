@@ -45,11 +45,15 @@ internal sealed record NbaMeterSettings
             ? meter with { Trigger = "physicalStick" } : meter;
     }
     internal JsonElement Export() => JsonSerializer.SerializeToElement(this, Json);
+    private static readonly Dictionary<string, ControlId> Controls = ControlMap.All.ToDictionary(
+        id => JsonNamingPolicy.CamelCase.ConvertName(id.ToString()));
+    private static readonly Dictionary<string, StickDirection> Directions = Enum.GetValues<StickDirection>().ToDictionary(
+        direction => JsonNamingPolicy.CamelCase.ConvertName(direction.ToString()));
     internal void Validate()
     {
         Viewport.Validate();
         if (Version != 1 || InputMode is not ("button" or "rhythm")
-            || Trigger is not ("physicalStick" or "smallLeft" or "smallRight" or "largeLeft" or "largeRight")
+            || (Trigger is null || (Trigger != "physicalStick" && !Controls.ContainsKey(Trigger) && !Directions.ContainsKey(Trigger)))
             || Style != "curved"
             || TargetRed is < 0 or > 255 || TargetGreen is < 0 or > 255 || TargetBlue is < 0 or > 255
             || !Between(ColorToleranceDegrees, 5, 60) || !Between(HoldMs, 0, 250) || !Between(AcquisitionWindowMs,100,3000)
@@ -95,14 +99,8 @@ internal sealed record NbaMeterSettings
     internal VisionControllerAction Action(Nba2K27ShotProfile profile, VisionSettings settings) => new()
     {
         Kind = InputMode == "rhythm" ? VisionActionKind.RightStickStroke : VisionActionKind.ButtonRelease,
-        TriggerPaddle = InputMode == "rhythm" ? Trigger switch
-        {
-            "smallLeft" => PaddleButtons.SmallLeft,
-            "smallRight" => PaddleButtons.SmallRight,
-            "largeLeft" => PaddleButtons.LargeLeft,
-            "largeRight" => PaddleButtons.LargeRight,
-            _ => PaddleButtons.None
-        } : PaddleButtons.None,
+        TriggerControl = InputMode == "rhythm" && Controls.TryGetValue(Trigger, out var control) ? control : null,
+        TriggerDirection = InputMode == "rhythm" && Directions.TryGetValue(Trigger, out var direction) ? direction : null,
         HoldQualificationMs = HoldMs, StrokeDurationMs = StrokeDurationMs, AnchorFraction = AnchorFraction, EndHoldMs = UpHoldMs,
         Curve = SmoothStroke ? VisionStrokeCurve.Smoothstep : VisionStrokeCurve.Linear, ConfigurationKey = Key(profile, settings)
     };
