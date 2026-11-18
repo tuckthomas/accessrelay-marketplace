@@ -6,6 +6,7 @@ internal interface INbaMeterDetector
 {
     NbaMeterDetector.Measurement? Detect(ReadOnlySpan<byte> pixels, int width, int height, int stride);
     bool Ambiguous { get; }
+    bool HasRailIdentity => false;
     void Reset();
 }
 
@@ -26,15 +27,31 @@ internal sealed partial class NbaMeterDetector(NbaMeterSettings settings) : INba
     private int _emptyOutlineStreak, _sessionShiftCount;
     private readonly record struct Cap(double X, double Y, double Width, int Area, int Left, int Top, int Right, int Bottom);
     public bool Ambiguous { get; private set; }
-    public void Reset() { _previous = null; _velocityX = _velocityY = 0; _emptyOutlineStreak = 0; Ambiguous = false; }
+    public bool HasRailIdentity { get; private set; }
+    private int _caplessFrames;
+    public void Reset() { HasRailIdentity = false; _caplessFrames = 0; _previous = null; _velocityX = _velocityY = 0; _emptyOutlineStreak = 0; Ambiguous = false; }
     public void ResetSession() { Reset(); _sessionHeight = 0; _sessionShiftCount = 0; }
 
     public Measurement? Detect(ReadOnlySpan<byte> pixels, int width, int height, int stride)
     {
         Ambiguous = false;
+        HasRailIdentity = false;
         var search = _previous is { } last ? Expand(ShiftPredicted(last.Bounds, _velocityX, _velocityY), .6) : settings.Viewport;
         var result = Search(pixels, width, height, stride, search);
-        if (result is null && _previous is not null) result = Search(pixels, width, height, stride, settings.Viewport);
+        if (!Ambiguous && result is not { MeasuredFill: true } &&
+            _previous is { MeasuredFill: true, Score: >= .78 } prior && _caplessFrames < 3)
+        {
+            var recovered = TrackRibbon(pixels, width, height, stride, prior);
+            if (HasRailIdentity)
+            {
+                _caplessFrames++;
+                if (recovered is null) return null;
+                result = recovered;
+            }
+        }
+        if (!HasRailIdentity && !Ambiguous && result is null && _previous is not null)
+            result = Search(pixels, width, height, stride, settings.Viewport);
+        if (!HasRailIdentity && result is { MeasuredFill: true }) _caplessFrames = 0;
         // The predictor bounds how long identity may survive a missing detection.
         if (result is { } found)
         {
@@ -90,6 +107,28 @@ internal sealed partial class NbaMeterDetector(NbaMeterSettings settings) : INba
         }
         return result;
     }
+    private Measurement? TrackRibbon(ReadOnlySpan<byte> pixels, int width, int height, int stride, Measurement prior)
+    {
+        // The search is bounded by the last real cap and samples native-resolution pixels.
+        // Check both the rails and their outer boundaries so a flat gray patch cannot hold identity.
+        double dx = Math.Clamp(_velocityX * width, -prior.Thickness, prior.Thickness);
+        double dy = Math.Clamp(_velocityY * height, -prior.Thickness, prior.Thickness);
+        double best = 0;
+        Measurement? result = null;
+        double step = Math.Max(1, prior.Thickness * .18);
+        foreach (double y in (ReadOnlySpan<double>)[0, -step, step])
+        foreach (double x in (ReadOnlySpan<double>)[0, -step, step])
+        {
+            var reading = ReadRibbon(pixels, width, height, stride, prior.TargetX + dx + x, prior.TargetY + dy + y,
+                Math.Sign(prior.Bow), prior.Thickness, prior.Height, verifyOutline: true, out double score);
+            if (score <= best) continue;
+            best = score;
+            result = reading is { } m ? StabilizeHeight(m, prior.Height, height) : null;
+        }
+        HasRailIdentity = best > 0;
+        return result;
+    }
+
     private Measurement? Search(ReadOnlySpan<byte> pixels, int width, int height, int stride, VisionCrop search)
     {
         int step = Math.Max(1, height / 720);

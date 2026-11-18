@@ -47,6 +47,13 @@ internal sealed partial class NbaMeterDetector
             bar=.75*prior.Thickness+.25*bar;
         double nominal=bar*8.2;
         if (nominal<height*.035 || nominal>height*.38 || cy+nominal*1.24>=height) return null;
+        return ReadRibbon(pixels, width, height, stride, cx, cy, side, bar, nominal, verifyOutline: false, out _);
+    }
+
+    private static Measurement? ReadRibbon(ReadOnlySpan<byte> pixels, int width, int height, int stride,
+        double cx, double cy, double side, double bar, double nominal, bool verifyOutline, out double railScore)
+    {
+        railScore = 0;
         int first=(int)Math.Ceiling(.06*nominal), last=(int)(1.24*nominal);
         // Sample the shade on both rails. Chroma and the continuous bright strip below
         // reject green court text and the detached white tempo tick next to the cap.
@@ -70,7 +77,7 @@ internal sealed partial class NbaMeterDetector
             if(count>bestCount){bestCount=count;shade=level;}
         }
         if(bestCount==0)return null;
-        int body=0, bodyRows=0, start=-1, end=-1, litRows=0, bestStart=0, bestEnd=0, bestLit=0;
+        int body=0, silhouetteRows=0, bodyRows=0, start=-1, end=-1, litRows=0, bestStart=0, bestEnd=0, bestLit=0;
         int gap=Math.Max(3,(int)Math.Round(bar*.20));
         Span<bool> rail=stackalloc bool[11];
         ReadOnlySpan<double> offsets=[-.60,-.45,-.33,-.22,-.10,0,.10,.22,.33,.45,.60];
@@ -88,7 +95,17 @@ internal sealed partial class NbaMeterDetector
             if(t is >=.16 and <=.88)
             {
                 bodyRows++;
-                if((rail[1]||rail[2]||rail[3]) && (rail[7]||rail[8]||rail[9]))body++;
+                if((rail[1]||rail[2]||rail[3]) && (rail[7]||rail[8]||rail[9]))
+                {
+                    body++;
+                    if (verifyOutline)
+                    {
+                        var outsideLeft = Pixel(pixels,width,height,stride,x-dx*.78,cy+row-dy*.78);
+                        var outsideRight = Pixel(pixels,width,height,stride,x+dx*.78,cy+row+dy*.78);
+                        if ((Math.Abs(outsideLeft.Luma-shade)>15 || outsideLeft.Chroma>30) &&
+                            (Math.Abs(outsideRight.Luma-shade)>15 || outsideRight.Chroma>30)) silhouetteRows++;
+                    }
+                }
             }
             if(bright<2 || !(rail[0]||rail[1]||rail[2]||rail[8]||rail[9]||rail[10]))continue;
             if(start<0 || row-end>gap){start=row;litRows=0;}
@@ -97,6 +114,11 @@ internal sealed partial class NbaMeterDetector
             {bestStart=start;bestEnd=end;bestLit=litRows;}
         }
         double confidence=body/(double)Math.Max(1,bodyRows);
+        if (verifyOutline)
+        {
+            if (confidence < .78 || silhouetteRows < .65 * bodyRows) return null;
+            railScore = (confidence + (double)silhouetteRows/bodyRows) / 2;
+        }
         if(bestLit==0 || confidence<.72 || bestLit<(bestEnd-bestStart+1)*.8)return null;
         double measuredHeight=bestEnd/.96, progress=CurvedProgress(measuredHeight,bestStart);
         double left=Math.Max(0,cx-(side<0?.27:.10)*measuredHeight-bar);

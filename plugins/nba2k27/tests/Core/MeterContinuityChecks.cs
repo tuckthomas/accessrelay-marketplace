@@ -8,6 +8,7 @@ internal static class MeterContinuityChecks
     {
         HoldUsesPhysicalTransition();
         ShortAndExpiredIdentity();
+        RailOnlyGrace();
         FailedForecastCannotRevive();
         AnchoredCompletionIsExplicit();
         HostRejectsHiddenFailures();
@@ -79,6 +80,27 @@ internal static class MeterContinuityChecks
         for (int t = 160; t <= 220; t += 20) emptyOutlineThenResidualFlash.At(t, null);
         var realMeterAfterFlash = emptyOutlineThenResidualFlash.At(240, .2);
         Check(realMeterAfterFlash.Acquired && !realMeterAfterFlash.InvalidateAttempt, "Real meter failed to acquire after residual flash cleared.");
+    }
+
+    private static void RailOnlyGrace()
+    {
+        foreach (bool recover in new[] { true, false })
+        {
+            using var f = new Fixture();
+            for (int i = 0; i <= 3; i++)
+            {
+                var result = f.At(20 * i, .2 + .06 * i, height: 640, measured: true);
+                if (i == 3) Check(result.TimeToTargetMs.HasValue, "Missing forecast before the weak frame.");
+            }
+            foreach (int ms in new[] { 80, 100 })
+            {
+                var held = f.At(ms, null, rails: true);
+                Check(!held.InvalidateAttempt && !held.Acquired && held.TimeToTargetMs is null &&
+                    !held.ContinueCommittedAction && held.Samples == 4, "Rail-only evidence refreshed timing.");
+            }
+            var next = f.At(110, recover ? .53 : null, height: 640, rails: !recover, measured: recover);
+            Check(recover ? next.TimeToTargetMs.HasValue : next.InvalidateAttempt, "Rail-only grace failed to recover or expire.");
+        }
     }
 
     private static void FailedForecastCannotRevive()
@@ -385,9 +407,10 @@ internal static class MeterContinuityChecks
         }
         internal static long Ticks(int ms) => Stopwatch.Frequency * 2 + (long)(ms * Stopwatch.Frequency / 1000d);
         internal VisionSignalObservation At(int ms, double? progress, double x = 20, double height = 160, bool ambiguous = false, int? inputMs = null,
-            long shotToken = 1, bool armed = true, long? holdStart = null)
+            long shotToken = 1, bool armed = true, long? holdStart = null, bool rails = false, bool measured = false)
         {
-            Time = ms; _detector.Next = progress is { } p ? new(new(.1, .1, .2, .6), p, .95, height, x, 20) : null;
+            Time = ms; _detector.Next = progress is { } p ? new(new(.1, .1, .2, .6), p, .95, height, x, 20) { MeasuredFill = measured } : null;
+            _detector.HasRailIdentity = rails;
             _detector.IsAmbiguous = ambiguous;
             long effectiveHoldStart = holdStart ?? HostStart;
             return _predictor.Observe(_pixels, 100, 100, 400, ++_sequence, 1, Ticks(ms),
@@ -405,6 +428,7 @@ internal static class MeterContinuityChecks
     {
         internal NbaMeterDetector.Measurement? Next;
         internal bool IsAmbiguous;
+        public bool HasRailIdentity { get; set; }
         public bool Ambiguous => IsAmbiguous;
         public NbaMeterDetector.Measurement? Detect(ReadOnlySpan<byte> pixels, int width, int height, int stride) => Next;
         public void Reset() { }

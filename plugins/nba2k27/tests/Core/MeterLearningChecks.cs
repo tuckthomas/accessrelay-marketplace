@@ -9,6 +9,7 @@ internal static class MeterLearningChecks
 
     internal static void Run()
     {
+        CheckWeakFrames();
         string directory = Directory.CreateTempSubdirectory("nba-meter-learning-").FullName;
         try
         {
@@ -87,11 +88,34 @@ internal static class MeterLearningChecks
         finally { Directory.Delete(directory, recursive: true); }
     }
 
-    private static void Render(byte[] pixels, double progress, bool twoMeters = false)
+    private static void CheckWeakFrames()
+    {
+        var pixels = new byte[Width * Height * 4];
+        var detector = new NbaMeterDetector(new());
+        NbaMeterDetector.Measurement? Read() => detector.Detect(pixels, Width, Height, Width * 4);
+
+        Render(pixels, .25);
+        if (Read() is not { MeasuredFill: true }) throw new Exception("The reference meter was missing.");
+        Render(pixels, .34, capVisible: false, shift: 2);
+        if (Read() is not { MeasuredFill: true, Progress: > .29 and < .39 } || !detector.HasRailIdentity)
+            throw new Exception("Lost the moving fill edge when the colored cap faded.");
+        Render(pixels, 0, capVisible: false, shift: 2);
+        if (Read() is not null || !detector.HasRailIdentity)
+            throw new Exception("Unlit rails acquired an invented fill measurement or lost their identity.");
+        Array.Fill(pixels, (byte)107);
+        if (Read() is not null || detector.HasRailIdentity)
+            throw new Exception("A flat patch of rail color retained the meter.");
+        detector.Reset();
+        Render(pixels, .4, capVisible: false);
+        if (Read() is not null || detector.HasRailIdentity)
+            throw new Exception("A new shot inherited the old cap.");
+    }
+
+    private static void Render(byte[] pixels, double progress, bool twoMeters = false, bool capVisible = true, int shift = 0)
     {
         // The rails and the moving inner fill are rasterized independently of the detector.
         System.Runtime.InteropServices.MemoryMarshal.Cast<byte, uint>(pixels.AsSpan()).Fill(0xff262626);
-        DrawMeter(245);
+        DrawMeter(245 + shift);
         if (twoMeters) DrawMeter(536);
 
         void DrawMeter(int centerX)
@@ -116,7 +140,7 @@ internal static class MeterLearningChecks
                     pixels[offset] = pixels[offset + 1] = pixels[offset + 2] = shade;
                     pixels[offset + 3] = 255;
                 }
-                if (Math.Abs(dx * .8 - dy * .6) <= 8 && Math.Abs(dx * .6 + dy * .8) <= 2)
+                if (capVisible && Math.Abs(dx * .8 - dy * .6) <= 8 && Math.Abs(dx * .6 + dy * .8) <= 2)
                 {
                     pixels[offset] = 95; pixels[offset + 1] = 210; pixels[offset + 2] = 80; pixels[offset + 3] = 255;
                 }

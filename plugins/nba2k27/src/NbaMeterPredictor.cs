@@ -16,6 +16,7 @@ internal sealed class NbaMeterPredictor(Nba2K27ShotProfile profile, NbaMeterSett
     private long _holdStart, _hostHoldStart, _lastCapture, _lastDetection, _hostShotToken, _generation = -1;
     private double _bestUncertainty = double.PositiveInfinity, _bestConfidence;
     private string? _attemptFailure;
+    private const double RailOnlyGraceMs = 40;
     private const double IdentityGraceMs = 70;
     private const double MinimumVelocityWindowMs = 58;
     private bool _held, _forecasted;
@@ -92,6 +93,9 @@ internal sealed class NbaMeterPredictor(Nba2K27ShotProfile profile, NbaMeterSett
         {
             if (_forecasted && anchored && _last?.Progress >= .5)
                 return ContinueStroke("Meter is no longer visible after the timing anchor; finishing the committed stroke.");
+            if (_acquired && _last is { MeasuredFill: true } && _detector.HasRailIdentity &&
+                (captureTicks - _lastDetection) * 1000d / Stopwatch.Frequency <= RailOnlyGraceMs)
+                return Observation("Meter rails tracked; waiting for a measured fill edge.");
             if (_forecasted) return Fail("Meter tracking was lost before the timing anchor. Return to neutral.");
             if (_last is not { MeasuredFill:true }) _count = 0;
             if (!_acquired) _sawPreShotClear = true;
