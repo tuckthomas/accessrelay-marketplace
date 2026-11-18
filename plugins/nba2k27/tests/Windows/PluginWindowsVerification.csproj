@@ -10,5 +10,6 @@
     <ProjectReference Include="../../accessrelay.nba2k27.csproj" />
     <ProjectReference Include="$(HostSdkRoot)/src/AccessRelayStudio.Runtime/AccessRelayStudio.Runtime.csproj" />
     <Compile Include="$(HostSdkRoot)/src/AccessRelayStudio/WindowsVerification/RuntimeTestDevices.cs" Link="RuntimeTestDevices.cs" />
+    <Compile Include="$(HostSdkRoot)/src/AccessRelayStudio/WindowsVerification/XboxColorConversionBenchmark.cs" Link="XboxColorConversionBenchmark.cs" />
   </ItemGroup>
 </Project>

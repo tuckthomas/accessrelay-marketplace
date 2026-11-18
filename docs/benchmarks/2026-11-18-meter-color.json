@@ -1,0 +1,1592 @@
+{
+  "date": "2026-11-18",
+  "gpu": "NVIDIA GeForce RTX 2070",
+  "driver": "610.88",
+  "gstreamer": "1.26.10",
+  "studioVersion": "1.9.0-beta.49",
+  "nbaVersion": "2.1.6",
+  "controllerPollMs": 2,
+  "clips": [
+    {
+      "clip": "A",
+      "source": "training-stick-as-p4",
+      "savedCalibration": true,
+      "sourceWidth": 1280,
+      "sourceHeight": 720,
+      "width": 2560,
+      "height": 1440,
+      "frames": 519,
+      "encodedSha256": "01e0a9d710956cefe666bff069759fe7798f94f28f0bb25e1c7ad77100dbef24",
+      "warmupFrames": 30,
+      "pairedSamples": 1466,
+      "pairedMedianMsSooner": 5.969,
+      "paths": [
+        {
+          "name": "CPU",
+          "consumerFrameIndex": 259,
+          "sampleCount": 1466,
+          "medianMs": 10.1728,
+          "p95Ms": 10.9649,
+          "consumers": {
+            "width": 2560,
+            "height": 1440,
+            "bytes": 14745600,
+            "previewExact": true,
+            "ocrInputExact": true,
+            "ocrTextRegions": 6,
+            "recordingExact": true
+          },
+          "passes": [
+            {
+              "delivered": 519,
+              "missing": [],
+              "stroke": {
+                "replacedAtMeter": 0,
+                "meterStartMedianMs": 10.1141,
+                "meterStartP95Ms": 11.2289,
+                "canArm": true,
+                "initialSavedSweeps": 5,
+                "allowedLatenessMs": 5,
+                "shots": [
+                  {
+                    "number": 1,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": true,
+                    "locatedFrames": 14,
+                    "maximumObservedFill": 0.6746400025141921,
+                    "upFromHoldMs": 583.0523,
+                    "forecastFromHoldMs": 485.433,
+                    "outcome": "Completed",
+                    "cancellationReason": null,
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": 574.3692,
+                    "localAnchorSlipMs": 0.6831,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": -70.5335
+                  },
+                  {
+                    "number": 2,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": false,
+                    "locatedFrames": 13,
+                    "maximumObservedFill": 0.622228904951604,
+                    "upFromHoldMs": null,
+                    "forecastFromHoldMs": null,
+                    "outcome": "Cancelled",
+                    "cancellationReason": "Prediction arrived after the allowed release deadline.",
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": null,
+                    "localAnchorSlipMs": null,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": null
+                  }
+                ]
+              }
+            },
+            {
+              "delivered": 518,
+              "missing": [
+                517
+              ],
+              "stroke": {
+                "replacedAtMeter": 0,
+                "meterStartMedianMs": 10.2833,
+                "meterStartP95Ms": 11.0239,
+                "canArm": true,
+                "initialSavedSweeps": 5,
+                "allowedLatenessMs": 5,
+                "shots": [
+                  {
+                    "number": 1,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": true,
+                    "locatedFrames": 14,
+                    "maximumObservedFill": 0.6746400025141921,
+                    "upFromHoldMs": 583.0523,
+                    "forecastFromHoldMs": 480.737,
+                    "outcome": "Completed",
+                    "cancellationReason": null,
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": 574.3692,
+                    "localAnchorSlipMs": 0.6831,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": -70.5335
+                  },
+                  {
+                    "number": 2,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": false,
+                    "locatedFrames": 13,
+                    "maximumObservedFill": 0.622228904951604,
+                    "upFromHoldMs": null,
+                    "forecastFromHoldMs": null,
+                    "outcome": "Cancelled",
+                    "cancellationReason": "Prediction arrived after the allowed release deadline.",
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": null,
+                    "localAnchorSlipMs": null,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": null
+                  }
+                ]
+              }
+            },
+            {
+              "delivered": 519,
+              "missing": [],
+              "stroke": {
+                "replacedAtMeter": 0,
+                "meterStartMedianMs": 10.1423,
+                "meterStartP95Ms": 10.8657,
+                "canArm": true,
+                "initialSavedSweeps": 5,
+                "allowedLatenessMs": 5,
+                "shots": [
+                  {
+                    "number": 1,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": true,
+                    "locatedFrames": 14,
+                    "maximumObservedFill": 0.6746400025141921,
+                    "upFromHoldMs": 583.0523,
+                    "forecastFromHoldMs": 480.7086,
+                    "outcome": "Completed",
+                    "cancellationReason": null,
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": 574.3692,
+                    "localAnchorSlipMs": 0.6831,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": -70.5335
+                  },
+                  {
+                    "number": 2,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": false,
+                    "locatedFrames": 13,
+                    "maximumObservedFill": 0.622228904951604,
+                    "upFromHoldMs": null,
+                    "forecastFromHoldMs": null,
+                    "outcome": "Cancelled",
+                    "cancellationReason": "Prediction arrived after the allowed release deadline.",
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": null,
+                    "localAnchorSlipMs": null,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": null
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GPU",
+          "consumerFrameIndex": 259,
+          "sampleCount": 1467,
+          "medianMs": 4.2187,
+          "p95Ms": 4.6631,
+          "consumers": {
+            "width": 2560,
+            "height": 1440,
+            "bytes": 14745600,
+            "previewExact": true,
+            "ocrInputExact": true,
+            "ocrTextRegions": 6,
+            "recordingExact": true
+          },
+          "passes": [
+            {
+              "delivered": 518,
+              "missing": [
+                0
+              ],
+              "stroke": {
+                "replacedAtMeter": 0,
+                "meterStartMedianMs": 4.2233,
+                "meterStartP95Ms": 4.6162,
+                "canArm": true,
+                "initialSavedSweeps": 5,
+                "allowedLatenessMs": 5,
+                "shots": [
+                  {
+                    "number": 1,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": true,
+                    "locatedFrames": 14,
+                    "maximumObservedFill": 0.6762607572751951,
+                    "upFromHoldMs": 585.0523,
+                    "forecastFromHoldMs": 474.583,
+                    "outcome": "Completed",
+                    "cancellationReason": null,
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": 575.1368,
+                    "localAnchorSlipMs": 1.9155,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": -68.5335
+                  },
+                  {
+                    "number": 2,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": true,
+                    "locatedFrames": 14,
+                    "maximumObservedFill": 0.6680749503636934,
+                    "upFromHoldMs": 591.5551,
+                    "forecastFromHoldMs": 482.1521,
+                    "outcome": "Completed",
+                    "cancellationReason": null,
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": 582.7215,
+                    "localAnchorSlipMs": 0.8336,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": -32.2077
+                  }
+                ]
+              }
+            },
+            {
+              "delivered": 519,
+              "missing": [],
+              "stroke": {
+                "replacedAtMeter": 0,
+                "meterStartMedianMs": 4.2061,
+                "meterStartP95Ms": 4.5831,
+                "canArm": true,
+                "initialSavedSweeps": 5,
+                "allowedLatenessMs": 5,
+                "shots": [
+                  {
+                    "number": 1,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": true,
+                    "locatedFrames": 14,
+                    "maximumObservedFill": 0.6762607572751951,
+                    "upFromHoldMs": 585.0523,
+                    "forecastFromHoldMs": 473.7538,
+                    "outcome": "Completed",
+                    "cancellationReason": null,
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": 575.1368,
+                    "localAnchorSlipMs": 1.9155,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": -68.5335
+                  },
+                  {
+                    "number": 2,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": true,
+                    "locatedFrames": 14,
+                    "maximumObservedFill": 0.6680749503636934,
+                    "upFromHoldMs": 591.5551,
+                    "forecastFromHoldMs": 481.9804,
+                    "outcome": "Completed",
+                    "cancellationReason": null,
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": 582.7215,
+                    "localAnchorSlipMs": 0.8336,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": -32.2077
+                  }
+                ]
+              }
+            },
+            {
+              "delivered": 519,
+              "missing": [],
+              "stroke": {
+                "replacedAtMeter": 0,
+                "meterStartMedianMs": 4.2281,
+                "meterStartP95Ms": 4.7829,
+                "canArm": true,
+                "initialSavedSweeps": 5,
+                "allowedLatenessMs": 5,
+                "shots": [
+                  {
+                    "number": 1,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": true,
+                    "locatedFrames": 14,
+                    "maximumObservedFill": 0.6762607572751951,
+                    "upFromHoldMs": 585.0523,
+                    "forecastFromHoldMs": 474.0427,
+                    "outcome": "Completed",
+                    "cancellationReason": null,
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": 575.1368,
+                    "localAnchorSlipMs": 1.9155,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": -68.5335
+                  },
+                  {
+                    "number": 2,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": true,
+                    "locatedFrames": 14,
+                    "maximumObservedFill": 0.6680749503636934,
+                    "upFromHoldMs": 591.5551,
+                    "forecastFromHoldMs": 482.1588,
+                    "outcome": "Completed",
+                    "cancellationReason": null,
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": 582.7215,
+                    "localAnchorSlipMs": 0.8336,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": -32.2077
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "clip": "B",
+      "source": "training-stick-as-p4",
+      "savedCalibration": true,
+      "sourceWidth": 1280,
+      "sourceHeight": 720,
+      "width": 2560,
+      "height": 1440,
+      "frames": 496,
+      "encodedSha256": "71f9d2e769213f19f6f3384d3602ee286c94529b1a266d33249ea0ba78cd6e87",
+      "warmupFrames": 30,
+      "pairedSamples": 1398,
+      "pairedMedianMsSooner": 5.907099999999999,
+      "paths": [
+        {
+          "name": "CPU",
+          "consumerFrameIndex": 248,
+          "sampleCount": 1398,
+          "medianMs": 10.1379,
+          "p95Ms": 10.8845,
+          "consumers": {
+            "width": 2560,
+            "height": 1440,
+            "bytes": 14745600,
+            "previewExact": true,
+            "ocrInputExact": true,
+            "ocrTextRegions": 5,
+            "recordingExact": true
+          },
+          "passes": [
+            {
+              "delivered": 496,
+              "missing": [],
+              "stroke": {
+                "replacedAtMeter": 0,
+                "meterStartMedianMs": 10.0988,
+                "meterStartP95Ms": 10.7227,
+                "canArm": true,
+                "initialSavedSweeps": 5,
+                "allowedLatenessMs": 5,
+                "shots": [
+                  {
+                    "number": 1,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": true,
+                    "locatedFrames": 11,
+                    "maximumObservedFill": 0.6173996378162754,
+                    "upFromHoldMs": 586.1412,
+                    "forecastFromHoldMs": 504.6038,
+                    "outcome": "Completed",
+                    "cancellationReason": null,
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": 577.6125,
+                    "localAnchorSlipMs": 0.5287,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": -70.7587
+                  },
+                  {
+                    "number": 2,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": false,
+                    "locatedFrames": 7,
+                    "maximumObservedFill": 0.43438061728772553,
+                    "upFromHoldMs": null,
+                    "forecastFromHoldMs": null,
+                    "outcome": "Cancelled",
+                    "cancellationReason": "The complete stick stroke cannot start before its calibrated anchor.",
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": null,
+                    "localAnchorSlipMs": null,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": null
+                  },
+                  {
+                    "number": 3,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": true,
+                    "locatedFrames": 11,
+                    "maximumObservedFill": 0.5143988966503371,
+                    "upFromHoldMs": 675.986,
+                    "forecastFromHoldMs": 573.8242,
+                    "outcome": "Cancelled",
+                    "cancellationReason": "Paddle release cancelled the pending action.",
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": 667.4591,
+                    "localAnchorSlipMs": 0.5269,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": 24.9048
+                  }
+                ]
+              }
+            },
+            {
+              "delivered": 496,
+              "missing": [],
+              "stroke": {
+                "replacedAtMeter": 0,
+                "meterStartMedianMs": 10.164,
+                "meterStartP95Ms": 10.9053,
+                "canArm": true,
+                "initialSavedSweeps": 5,
+                "allowedLatenessMs": 5,
+                "shots": [
+                  {
+                    "number": 1,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": true,
+                    "locatedFrames": 11,
+                    "maximumObservedFill": 0.6173996378162754,
+                    "upFromHoldMs": 586.1412,
+                    "forecastFromHoldMs": 500.0646,
+                    "outcome": "Completed",
+                    "cancellationReason": null,
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": 577.6125,
+                    "localAnchorSlipMs": 0.5287,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": -70.7587
+                  },
+                  {
+                    "number": 2,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": false,
+                    "locatedFrames": 7,
+                    "maximumObservedFill": 0.43438061728772553,
+                    "upFromHoldMs": null,
+                    "forecastFromHoldMs": null,
+                    "outcome": "Cancelled",
+                    "cancellationReason": "The complete stick stroke cannot start before its calibrated anchor.",
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": null,
+                    "localAnchorSlipMs": null,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": null
+                  },
+                  {
+                    "number": 3,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": true,
+                    "locatedFrames": 11,
+                    "maximumObservedFill": 0.5143988966503371,
+                    "upFromHoldMs": 675.986,
+                    "forecastFromHoldMs": 573.4542,
+                    "outcome": "Cancelled",
+                    "cancellationReason": "Paddle release cancelled the pending action.",
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": 667.4591,
+                    "localAnchorSlipMs": 0.5269,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": 24.9048
+                  }
+                ]
+              }
+            },
+            {
+              "delivered": 496,
+              "missing": [],
+              "stroke": {
+                "replacedAtMeter": 0,
+                "meterStartMedianMs": 10.1658,
+                "meterStartP95Ms": 10.9571,
+                "canArm": true,
+                "initialSavedSweeps": 5,
+                "allowedLatenessMs": 5,
+                "shots": [
+                  {
+                    "number": 1,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": true,
+                    "locatedFrames": 11,
+                    "maximumObservedFill": 0.6173996378162754,
+                    "upFromHoldMs": 586.1412,
+                    "forecastFromHoldMs": 499.6627,
+                    "outcome": "Completed",
+                    "cancellationReason": null,
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": 577.6125,
+                    "localAnchorSlipMs": 0.5287,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": -70.7587
+                  },
+                  {
+                    "number": 2,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": false,
+                    "locatedFrames": 7,
+                    "maximumObservedFill": 0.43438061728772553,
+                    "upFromHoldMs": null,
+                    "forecastFromHoldMs": null,
+                    "outcome": "Cancelled",
+                    "cancellationReason": "The complete stick stroke cannot start before its calibrated anchor.",
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": null,
+                    "localAnchorSlipMs": null,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": null
+                  },
+                  {
+                    "number": 3,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": true,
+                    "locatedFrames": 11,
+                    "maximumObservedFill": 0.5143988966503371,
+                    "upFromHoldMs": 675.986,
+                    "forecastFromHoldMs": 573.7815,
+                    "outcome": "Cancelled",
+                    "cancellationReason": "Paddle release cancelled the pending action.",
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": 667.4591,
+                    "localAnchorSlipMs": 0.5269,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": 24.9048
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GPU",
+          "consumerFrameIndex": 248,
+          "sampleCount": 1398,
+          "medianMs": 4.2263,
+          "p95Ms": 4.6104,
+          "consumers": {
+            "width": 2560,
+            "height": 1440,
+            "bytes": 14745600,
+            "previewExact": true,
+            "ocrInputExact": true,
+            "ocrTextRegions": 5,
+            "recordingExact": true
+          },
+          "passes": [
+            {
+              "delivered": 495,
+              "missing": [
+                0
+              ],
+              "stroke": {
+                "replacedAtMeter": 0,
+                "meterStartMedianMs": 4.2292,
+                "meterStartP95Ms": 4.6234,
+                "canArm": true,
+                "initialSavedSweeps": 5,
+                "allowedLatenessMs": 5,
+                "shots": [
+                  {
+                    "number": 1,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": true,
+                    "locatedFrames": 11,
+                    "maximumObservedFill": 0.6193140978796653,
+                    "upFromHoldMs": 586.1412,
+                    "forecastFromHoldMs": 493.9072,
+                    "outcome": "Completed",
+                    "cancellationReason": null,
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": 577.0201,
+                    "localAnchorSlipMs": 1.1211,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": -70.7587
+                  },
+                  {
+                    "number": 2,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": false,
+                    "locatedFrames": 11,
+                    "maximumObservedFill": 0.5934588261343527,
+                    "upFromHoldMs": null,
+                    "forecastFromHoldMs": null,
+                    "outcome": "Cancelled",
+                    "cancellationReason": "Paddle release cancelled the pending action.",
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": null,
+                    "localAnchorSlipMs": null,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": null
+                  },
+                  {
+                    "number": 3,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": true,
+                    "locatedFrames": 13,
+                    "maximumObservedFill": 0.5984151438247581,
+                    "upFromHoldMs": 675.986,
+                    "forecastFromHoldMs": 567.7858,
+                    "outcome": "Cancelled",
+                    "cancellationReason": "Paddle release cancelled the pending action.",
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": 666.8439,
+                    "localAnchorSlipMs": 1.1421,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": 24.9048
+                  }
+                ]
+              }
+            },
+            {
+              "delivered": 496,
+              "missing": [],
+              "stroke": {
+                "replacedAtMeter": 0,
+                "meterStartMedianMs": 4.2263,
+                "meterStartP95Ms": 4.6221,
+                "canArm": true,
+                "initialSavedSweeps": 5,
+                "allowedLatenessMs": 5,
+                "shots": [
+                  {
+                    "number": 1,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": true,
+                    "locatedFrames": 11,
+                    "maximumObservedFill": 0.6193140978796653,
+                    "upFromHoldMs": 584.1412,
+                    "forecastFromHoldMs": 493.4294,
+                    "outcome": "Completed",
+                    "cancellationReason": null,
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": 575.9134,
+                    "localAnchorSlipMs": 0.2278,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": -72.7587
+                  },
+                  {
+                    "number": 2,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": false,
+                    "locatedFrames": 11,
+                    "maximumObservedFill": 0.5934588261343527,
+                    "upFromHoldMs": null,
+                    "forecastFromHoldMs": null,
+                    "outcome": "Cancelled",
+                    "cancellationReason": "Paddle release cancelled the pending action.",
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": null,
+                    "localAnchorSlipMs": null,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": null
+                  },
+                  {
+                    "number": 3,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": true,
+                    "locatedFrames": 13,
+                    "maximumObservedFill": 0.5984151438247581,
+                    "upFromHoldMs": 675.986,
+                    "forecastFromHoldMs": 567.4944,
+                    "outcome": "Cancelled",
+                    "cancellationReason": "Paddle release cancelled the pending action.",
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": 666.8439,
+                    "localAnchorSlipMs": 1.1421,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": 24.9048
+                  }
+                ]
+              }
+            },
+            {
+              "delivered": 496,
+              "missing": [],
+              "stroke": {
+                "replacedAtMeter": 0,
+                "meterStartMedianMs": 4.2209,
+                "meterStartP95Ms": 4.5956,
+                "canArm": true,
+                "initialSavedSweeps": 5,
+                "allowedLatenessMs": 5,
+                "shots": [
+                  {
+                    "number": 1,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": true,
+                    "locatedFrames": 11,
+                    "maximumObservedFill": 0.6193140978796653,
+                    "upFromHoldMs": 586.1412,
+                    "forecastFromHoldMs": 493.6246,
+                    "outcome": "Completed",
+                    "cancellationReason": null,
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": 577.0201,
+                    "localAnchorSlipMs": 1.1211,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": -70.7587
+                  },
+                  {
+                    "number": 2,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": false,
+                    "locatedFrames": 11,
+                    "maximumObservedFill": 0.5934588261343527,
+                    "upFromHoldMs": null,
+                    "forecastFromHoldMs": null,
+                    "outcome": "Cancelled",
+                    "cancellationReason": "Paddle release cancelled the pending action.",
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": null,
+                    "localAnchorSlipMs": null,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": null
+                  },
+                  {
+                    "number": 3,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": true,
+                    "locatedFrames": 13,
+                    "maximumObservedFill": 0.5984151438247581,
+                    "upFromHoldMs": 675.986,
+                    "forecastFromHoldMs": 567.5062,
+                    "outcome": "Cancelled",
+                    "cancellationReason": "Paddle release cancelled the pending action.",
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": 666.8439,
+                    "localAnchorSlipMs": 1.1421,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": 24.9048
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "clip": "C",
+      "source": "training-stick-as-p4",
+      "savedCalibration": true,
+      "sourceWidth": 1280,
+      "sourceHeight": 720,
+      "width": 2560,
+      "height": 1440,
+      "frames": 598,
+      "encodedSha256": "0cb7959a85b14680efdad610e2ad59d9ad6f42da580173541a424b53f2cc7d21",
+      "warmupFrames": 30,
+      "pairedSamples": 1704,
+      "pairedMedianMsSooner": 5.9563999999999995,
+      "paths": [
+        {
+          "name": "CPU",
+          "consumerFrameIndex": 299,
+          "sampleCount": 1704,
+          "medianMs": 10.1886,
+          "p95Ms": 11.0093,
+          "consumers": {
+            "width": 2560,
+            "height": 1440,
+            "bytes": 14745600,
+            "previewExact": true,
+            "ocrInputExact": true,
+            "ocrTextRegions": 6,
+            "recordingExact": true
+          },
+          "passes": [
+            {
+              "delivered": 598,
+              "missing": [],
+              "stroke": {
+                "replacedAtMeter": 0,
+                "meterStartMedianMs": 10.1973,
+                "meterStartP95Ms": 12.0454,
+                "canArm": true,
+                "initialSavedSweeps": 5,
+                "allowedLatenessMs": 5,
+                "shots": [
+                  {
+                    "number": 1,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": true,
+                    "locatedFrames": 18,
+                    "maximumObservedFill": 0.6737202976768035,
+                    "upFromHoldMs": 664.4619,
+                    "forecastFromHoldMs": 581.0912,
+                    "outcome": "Completed",
+                    "cancellationReason": null,
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": 655.8048,
+                    "localAnchorSlipMs": 0.6571,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": -21.9954
+                  }
+                ]
+              }
+            },
+            {
+              "delivered": 598,
+              "missing": [],
+              "stroke": {
+                "replacedAtMeter": 0,
+                "meterStartMedianMs": 10.2225,
+                "meterStartP95Ms": 11.0702,
+                "canArm": true,
+                "initialSavedSweeps": 5,
+                "allowedLatenessMs": 5,
+                "shots": [
+                  {
+                    "number": 1,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": true,
+                    "locatedFrames": 18,
+                    "maximumObservedFill": 0.6737202976768035,
+                    "upFromHoldMs": 664.4619,
+                    "forecastFromHoldMs": 575.3143,
+                    "outcome": "Completed",
+                    "cancellationReason": null,
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": 655.8048,
+                    "localAnchorSlipMs": 0.6571,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": -21.9954
+                  }
+                ]
+              }
+            },
+            {
+              "delivered": 598,
+              "missing": [],
+              "stroke": {
+                "replacedAtMeter": 0,
+                "meterStartMedianMs": 10.1523,
+                "meterStartP95Ms": 11.0708,
+                "canArm": true,
+                "initialSavedSweeps": 5,
+                "allowedLatenessMs": 5,
+                "shots": [
+                  {
+                    "number": 1,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": true,
+                    "locatedFrames": 18,
+                    "maximumObservedFill": 0.6737202976768035,
+                    "upFromHoldMs": 664.4619,
+                    "forecastFromHoldMs": 581.0539,
+                    "outcome": "Completed",
+                    "cancellationReason": null,
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": 655.8048,
+                    "localAnchorSlipMs": 0.6571,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": -21.9954
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GPU",
+          "consumerFrameIndex": 299,
+          "sampleCount": 1704,
+          "medianMs": 4.2391,
+          "p95Ms": 4.7244,
+          "consumers": {
+            "width": 2560,
+            "height": 1440,
+            "bytes": 14745600,
+            "previewExact": true,
+            "ocrInputExact": true,
+            "ocrTextRegions": 6,
+            "recordingExact": true
+          },
+          "passes": [
+            {
+              "delivered": 598,
+              "missing": [],
+              "stroke": {
+                "replacedAtMeter": 0,
+                "meterStartMedianMs": 4.2587,
+                "meterStartP95Ms": 4.8196,
+                "canArm": true,
+                "initialSavedSweeps": 5,
+                "allowedLatenessMs": 5,
+                "shots": [
+                  {
+                    "number": 1,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": true,
+                    "locatedFrames": 18,
+                    "maximumObservedFill": 0.6743392960121841,
+                    "upFromHoldMs": 660.4619,
+                    "forecastFromHoldMs": 550.497,
+                    "outcome": "Completed",
+                    "cancellationReason": null,
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": 651.9624,
+                    "localAnchorSlipMs": 0.4995,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": -25.9954
+                  }
+                ]
+              }
+            },
+            {
+              "delivered": 598,
+              "missing": [],
+              "stroke": {
+                "replacedAtMeter": 0,
+                "meterStartMedianMs": 4.258,
+                "meterStartP95Ms": 4.7089,
+                "canArm": true,
+                "initialSavedSweeps": 5,
+                "allowedLatenessMs": 5,
+                "shots": [
+                  {
+                    "number": 1,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": true,
+                    "locatedFrames": 18,
+                    "maximumObservedFill": 0.6743392960121841,
+                    "upFromHoldMs": 660.4619,
+                    "forecastFromHoldMs": 550.0874,
+                    "outcome": "Completed",
+                    "cancellationReason": null,
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": 651.9624,
+                    "localAnchorSlipMs": 0.4995,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": -25.9954
+                  }
+                ]
+              }
+            },
+            {
+              "delivered": 598,
+              "missing": [],
+              "stroke": {
+                "replacedAtMeter": 0,
+                "meterStartMedianMs": 4.2016,
+                "meterStartP95Ms": 4.6326,
+                "canArm": true,
+                "initialSavedSweeps": 5,
+                "allowedLatenessMs": 5,
+                "shots": [
+                  {
+                    "number": 1,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": true,
+                    "locatedFrames": 18,
+                    "maximumObservedFill": 0.6743392960121841,
+                    "upFromHoldMs": 660.4619,
+                    "forecastFromHoldMs": 550.1878,
+                    "outcome": "Completed",
+                    "cancellationReason": null,
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": 651.9624,
+                    "localAnchorSlipMs": 0.4995,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": -25.9954
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "clip": "B-native",
+      "source": "training-stick-as-p4",
+      "savedCalibration": false,
+      "sourceWidth": 1280,
+      "sourceHeight": 720,
+      "width": 1280,
+      "height": 720,
+      "frames": 496,
+      "encodedSha256": "f36827c09c533f8a7b85205948e944c3e300e357815b08e996e4e6c8598ae5a6",
+      "warmupFrames": 30,
+      "pairedSamples": 1398,
+      "pairedMedianMsSooner": 1.1809999999999998,
+      "paths": [
+        {
+          "name": "CPU",
+          "consumerFrameIndex": 248,
+          "sampleCount": 1398,
+          "medianMs": 2.6414,
+          "p95Ms": 2.9461,
+          "consumers": {
+            "width": 1280,
+            "height": 720,
+            "bytes": 3686400,
+            "previewExact": true,
+            "ocrInputExact": true,
+            "ocrTextRegions": 5,
+            "recordingExact": true
+          },
+          "passes": [
+            {
+              "delivered": 496,
+              "missing": [],
+              "stroke": {
+                "replacedAtMeter": 0,
+                "meterStartMedianMs": 2.6357,
+                "meterStartP95Ms": 2.9282,
+                "canArm": true,
+                "initialSavedSweeps": 0,
+                "allowedLatenessMs": 5,
+                "shots": [
+                  {
+                    "number": 1,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": false,
+                    "locatedFrames": 8,
+                    "maximumObservedFill": 0.6140223724902762,
+                    "upFromHoldMs": null,
+                    "forecastFromHoldMs": null,
+                    "outcome": "Cancelled",
+                    "cancellationReason": "Meter identity expired before reacquisition. Return to neutral.",
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": null,
+                    "localAnchorSlipMs": null,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": null
+                  },
+                  {
+                    "number": 2,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": false,
+                    "locatedFrames": 9,
+                    "maximumObservedFill": 0.5861542287427064,
+                    "upFromHoldMs": null,
+                    "forecastFromHoldMs": null,
+                    "outcome": "Cancelled",
+                    "cancellationReason": "Paddle release cancelled the pending action.",
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": null,
+                    "localAnchorSlipMs": null,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": null
+                  },
+                  {
+                    "number": 3,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": false,
+                    "locatedFrames": 10,
+                    "maximumObservedFill": 0.5499890823893719,
+                    "upFromHoldMs": null,
+                    "forecastFromHoldMs": null,
+                    "outcome": "Cancelled",
+                    "cancellationReason": "Paddle release cancelled the pending action.",
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": null,
+                    "localAnchorSlipMs": null,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": null
+                  }
+                ]
+              }
+            },
+            {
+              "delivered": 496,
+              "missing": [],
+              "stroke": {
+                "replacedAtMeter": 0,
+                "meterStartMedianMs": 2.631,
+                "meterStartP95Ms": 2.8596,
+                "canArm": true,
+                "initialSavedSweeps": 0,
+                "allowedLatenessMs": 5,
+                "shots": [
+                  {
+                    "number": 1,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": false,
+                    "locatedFrames": 8,
+                    "maximumObservedFill": 0.6140223724902762,
+                    "upFromHoldMs": null,
+                    "forecastFromHoldMs": null,
+                    "outcome": "Cancelled",
+                    "cancellationReason": "Meter identity expired before reacquisition. Return to neutral.",
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": null,
+                    "localAnchorSlipMs": null,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": null
+                  },
+                  {
+                    "number": 2,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": false,
+                    "locatedFrames": 9,
+                    "maximumObservedFill": 0.5861542287427064,
+                    "upFromHoldMs": null,
+                    "forecastFromHoldMs": null,
+                    "outcome": "Cancelled",
+                    "cancellationReason": "Paddle release cancelled the pending action.",
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": null,
+                    "localAnchorSlipMs": null,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": null
+                  },
+                  {
+                    "number": 3,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": false,
+                    "locatedFrames": 10,
+                    "maximumObservedFill": 0.5499890823893719,
+                    "upFromHoldMs": null,
+                    "forecastFromHoldMs": null,
+                    "outcome": "Cancelled",
+                    "cancellationReason": "Paddle release cancelled the pending action.",
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": null,
+                    "localAnchorSlipMs": null,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": null
+                  }
+                ]
+              }
+            },
+            {
+              "delivered": 496,
+              "missing": [],
+              "stroke": {
+                "replacedAtMeter": 0,
+                "meterStartMedianMs": 2.6605,
+                "meterStartP95Ms": 3.0182,
+                "canArm": true,
+                "initialSavedSweeps": 0,
+                "allowedLatenessMs": 5,
+                "shots": [
+                  {
+                    "number": 1,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": false,
+                    "locatedFrames": 8,
+                    "maximumObservedFill": 0.6140223724902762,
+                    "upFromHoldMs": null,
+                    "forecastFromHoldMs": null,
+                    "outcome": "Cancelled",
+                    "cancellationReason": "Meter identity expired before reacquisition. Return to neutral.",
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": null,
+                    "localAnchorSlipMs": null,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": null
+                  },
+                  {
+                    "number": 2,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": false,
+                    "locatedFrames": 9,
+                    "maximumObservedFill": 0.5861542287427064,
+                    "upFromHoldMs": null,
+                    "forecastFromHoldMs": null,
+                    "outcome": "Cancelled",
+                    "cancellationReason": "Paddle release cancelled the pending action.",
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": null,
+                    "localAnchorSlipMs": null,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": null
+                  },
+                  {
+                    "number": 3,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": false,
+                    "locatedFrames": 10,
+                    "maximumObservedFill": 0.5499890823893719,
+                    "upFromHoldMs": null,
+                    "forecastFromHoldMs": null,
+                    "outcome": "Cancelled",
+                    "cancellationReason": "Paddle release cancelled the pending action.",
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": null,
+                    "localAnchorSlipMs": null,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": null
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GPU",
+          "consumerFrameIndex": 248,
+          "sampleCount": 1398,
+          "medianMs": 1.4785,
+          "p95Ms": 1.696,
+          "consumers": {
+            "width": 1280,
+            "height": 720,
+            "bytes": 3686400,
+            "previewExact": true,
+            "ocrInputExact": true,
+            "ocrTextRegions": 5,
+            "recordingExact": true
+          },
+          "passes": [
+            {
+              "delivered": 496,
+              "missing": [],
+              "stroke": {
+                "replacedAtMeter": 0,
+                "meterStartMedianMs": 1.4691,
+                "meterStartP95Ms": 1.6877,
+                "canArm": true,
+                "initialSavedSweeps": 0,
+                "allowedLatenessMs": 5,
+                "shots": [
+                  {
+                    "number": 1,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": false,
+                    "locatedFrames": 13,
+                    "maximumObservedFill": 0.7883282003129571,
+                    "upFromHoldMs": null,
+                    "forecastFromHoldMs": null,
+                    "outcome": "Cancelled",
+                    "cancellationReason": "Paddle release cancelled the pending action.",
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": null,
+                    "localAnchorSlipMs": null,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": null
+                  },
+                  {
+                    "number": 2,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": false,
+                    "locatedFrames": 10,
+                    "maximumObservedFill": 0.5855264700892845,
+                    "upFromHoldMs": null,
+                    "forecastFromHoldMs": null,
+                    "outcome": "Cancelled",
+                    "cancellationReason": "Paddle release cancelled the pending action.",
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": null,
+                    "localAnchorSlipMs": null,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": null
+                  },
+                  {
+                    "number": 3,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": false,
+                    "locatedFrames": 11,
+                    "maximumObservedFill": 0.5841269841269842,
+                    "upFromHoldMs": null,
+                    "forecastFromHoldMs": null,
+                    "outcome": "Cancelled",
+                    "cancellationReason": "Paddle release cancelled the pending action.",
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": null,
+                    "localAnchorSlipMs": null,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": null
+                  }
+                ]
+              }
+            },
+            {
+              "delivered": 496,
+              "missing": [],
+              "stroke": {
+                "replacedAtMeter": 0,
+                "meterStartMedianMs": 1.4858,
+                "meterStartP95Ms": 1.728,
+                "canArm": true,
+                "initialSavedSweeps": 0,
+                "allowedLatenessMs": 5,
+                "shots": [
+                  {
+                    "number": 1,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": false,
+                    "locatedFrames": 13,
+                    "maximumObservedFill": 0.7883282003129571,
+                    "upFromHoldMs": null,
+                    "forecastFromHoldMs": null,
+                    "outcome": "Cancelled",
+                    "cancellationReason": "Paddle release cancelled the pending action.",
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": null,
+                    "localAnchorSlipMs": null,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": null
+                  },
+                  {
+                    "number": 2,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": false,
+                    "locatedFrames": 10,
+                    "maximumObservedFill": 0.5855264700892845,
+                    "upFromHoldMs": null,
+                    "forecastFromHoldMs": null,
+                    "outcome": "Cancelled",
+                    "cancellationReason": "Paddle release cancelled the pending action.",
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": null,
+                    "localAnchorSlipMs": null,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": null
+                  },
+                  {
+                    "number": 3,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": false,
+                    "locatedFrames": 11,
+                    "maximumObservedFill": 0.5841269841269842,
+                    "upFromHoldMs": null,
+                    "forecastFromHoldMs": null,
+                    "outcome": "Cancelled",
+                    "cancellationReason": "Paddle release cancelled the pending action.",
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": null,
+                    "localAnchorSlipMs": null,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": null
+                  }
+                ]
+              }
+            },
+            {
+              "delivered": 496,
+              "missing": [],
+              "stroke": {
+                "replacedAtMeter": 0,
+                "meterStartMedianMs": 1.476,
+                "meterStartP95Ms": 1.6561,
+                "canArm": true,
+                "initialSavedSweeps": 0,
+                "allowedLatenessMs": 5,
+                "shots": [
+                  {
+                    "number": 1,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": false,
+                    "locatedFrames": 13,
+                    "maximumObservedFill": 0.7883282003129571,
+                    "upFromHoldMs": null,
+                    "forecastFromHoldMs": null,
+                    "outcome": "Cancelled",
+                    "cancellationReason": "Paddle release cancelled the pending action.",
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": null,
+                    "localAnchorSlipMs": null,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": null
+                  },
+                  {
+                    "number": 2,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": false,
+                    "locatedFrames": 10,
+                    "maximumObservedFill": 0.5855264700892845,
+                    "upFromHoldMs": null,
+                    "forecastFromHoldMs": null,
+                    "outcome": "Cancelled",
+                    "cancellationReason": "Paddle release cancelled the pending action.",
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": null,
+                    "localAnchorSlipMs": null,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": null
+                  },
+                  {
+                    "number": 3,
+                    "armed": true,
+                    "censored": false,
+                    "fullUp": false,
+                    "locatedFrames": 11,
+                    "maximumObservedFill": 0.5841269841269842,
+                    "upFromHoldMs": null,
+                    "forecastFromHoldMs": null,
+                    "outcome": "Cancelled",
+                    "cancellationReason": "Paddle release cancelled the pending action.",
+                    "lastSignal": null,
+                    "scheduledAnchorFromHoldMs": null,
+                    "localAnchorSlipMs": null,
+                    "anchorVsRecordedMs": null,
+                    "upVsManualMs": null
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "physicalP4TimingOnly": {
+    "gainMs": 5.9564,
+    "results": [
+      {
+        "file": "attempt-1.json",
+        "releaseObserved": true,
+        "allowedLatenessMs": 5,
+        "originalLocalAnchorSlipMs": 0.6619,
+        "original": {
+          "fullUpFromPressMs": 847.8347,
+          "anchorVsRecordedMs": 1.2793,
+          "outcome": "Completed",
+          "reason": null
+        },
+        "earlierDelivery": {
+          "fullUpFromPressMs": 847.8347,
+          "anchorVsRecordedMs": 1.2793,
+          "outcome": "Completed",
+          "reason": null
+        }
+      },
+      {
+        "file": "attempt-2.json",
+        "releaseObserved": true,
+        "allowedLatenessMs": 5,
+        "originalLocalAnchorSlipMs": 1.2821,
+        "original": {
+          "fullUpFromPressMs": 661.9242,
+          "anchorVsRecordedMs": 1.2929,
+          "outcome": "Completed",
+          "reason": null
+        },
+        "earlierDelivery": {
+          "fullUpFromPressMs": 661.9242,
+          "anchorVsRecordedMs": 1.2929,
+          "outcome": "Completed",
+          "reason": null
+        }
+      },
+      {
+        "file": "attempt-3.json",
+        "releaseObserved": true,
+        "allowedLatenessMs": 5,
+        "originalLocalAnchorSlipMs": 2.2886,
+        "original": {
+          "fullUpFromPressMs": 678.4778,
+          "anchorVsRecordedMs": 0.1661,
+          "outcome": "Completed",
+          "reason": null
+        },
+        "earlierDelivery": {
+          "fullUpFromPressMs": 678.4778,
+          "anchorVsRecordedMs": 0.1661,
+          "outcome": "Completed",
+          "reason": null
+        }
+      },
+      {
+        "file": "attempt-4.json",
+        "releaseObserved": true,
+        "allowedLatenessMs": 5,
+        "originalLocalAnchorSlipMs": 0.7885,
+        "original": {
+          "fullUpFromPressMs": 677.4443,
+          "anchorVsRecordedMs": 0.0321,
+          "outcome": "Completed",
+          "reason": null
+        },
+        "earlierDelivery": {
+          "fullUpFromPressMs": 675.4443,
+          "anchorVsRecordedMs": 0.0321,
+          "outcome": "Completed",
+          "reason": null
+        }
+      },
+      {
+        "file": "attempt-5.json",
+        "releaseObserved": true,
+        "allowedLatenessMs": 5,
+        "originalLocalAnchorSlipMs": 0.6083,
+        "original": {
+          "fullUpFromPressMs": 678.8833,
+          "anchorVsRecordedMs": 1.3747,
+          "outcome": "Completed",
+          "reason": null
+        },
+        "earlierDelivery": {
+          "fullUpFromPressMs": 678.8833,
+          "anchorVsRecordedMs": 3.3747,
+          "outcome": "Completed",
+          "reason": null
+        }
+      },
+      {
+        "file": "attempt-6.json",
+        "releaseObserved": true,
+        "allowedLatenessMs": 5,
+        "originalLocalAnchorSlipMs": 0.2733,
+        "original": {
+          "fullUpFromPressMs": 661.9643,
+          "anchorVsRecordedMs": 0.7855,
+          "outcome": "Completed",
+          "reason": null
+        },
+        "earlierDelivery": {
+          "fullUpFromPressMs": 661.9643,
+          "anchorVsRecordedMs": 0.7855,
+          "outcome": "Completed",
+          "reason": null
+        }
+      }
+    ]
+  }
+}

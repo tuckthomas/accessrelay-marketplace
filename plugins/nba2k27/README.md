@@ -3,6 +3,9 @@
 The Marketplace catalog includes NBA 2K27 version 2.1.6. The add-on requires runtime
 contract 4, which ships with AccessRelay Studio 1.9.0-beta.49.
 
+The [Windows shot meter replay](../../docs/nba2k27-meter-color-replay.md) measures full-frame
+delivery and compares P4 upstroke timing with CPU and GPU color conversion.
+
 For a curved meter in practice, keep the trial running through two stationary shots
 with the shot meter visible. Studio measures the bright fill against the gray sides
 of the meter. If two meters appear before tracking starts, the add-on keeps looking

@@ -1,5 +1,11 @@
 using EliteScriptStudio.Vision;
 
+if (args is ["--meter-color-replay", var replay, var models, var replayRuntime, var report])
+{
+    MeterColorReplay.Run(replay, models, replayRuntime, report);
+    return;
+}
+
 if (args is ["--prepare-recorded-scene", var sceneRuntime, var sceneAssets, var sceneDirectory])
 {
     AutomaticCaptureModelChecks.PrepareScene(sceneRuntime, sceneAssets, sceneDirectory);
