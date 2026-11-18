@@ -285,7 +285,7 @@ export function MeterAssistance({ state = {}, status, command, captureWindow, ed
   const ready = !!profile?.usesShotMeter && !!source && connected && !inputMissing && !dirty && !s.stopping && !(session.running && session.sourceStale)
     && (!session.running || session.canArm || prepare);
   const nextStep = !profile ? 'Choose your shot profile.' : !profile.usesShotMeter ? 'Enable the shot meter in this profile and in NBA 2K27.'
-    : !source ? (s.xbox?.direct ? 'Connect your Xbox above.' : 'Choose the Remote Play window above.')
+    : !source ? (s.xbox?.direct ? 'Connect your Xbox above.' : 'Choose a capture source above.')
     : session.sourceStale ? 'Resume the Remote Play stream in your browser.' : inputMissing ? 'Connect your physical controller.'
     : dirty ? 'Apply or discard your settings changes before starting a trial.'
     : !connected ? 'Connect controller output below.'

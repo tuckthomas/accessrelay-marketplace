@@ -141,7 +141,7 @@ internal sealed class Nba2K27ShotProfileStore
     private static bool IsInvalidOrUnavailable(Exception error) => error is IOException or UnauthorizedAccessException
         or InvalidDataException or ArgumentException;
 
-    private static void WriteAtomically(string path, byte[] bytes)
+    internal static void WriteAtomically(string path, byte[] bytes)
     {
         string temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try

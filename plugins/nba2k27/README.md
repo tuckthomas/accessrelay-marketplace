@@ -1,7 +1,16 @@
 # NBA 2K27 implementation
 
-Development version 2.2.0-beta.1 requires Studio runtime contract 4 (the paired
-`fix/auto-green-reliability` branch). It is not published to the catalog by this PR.
+The Marketplace catalog includes NBA 2K27 version 2.1.6. The add-on requires runtime
+contract 4, which ships with AccessRelay Studio 1.9.0-beta.49.
+
+For a curved meter in practice, keep the trial running through two stationary shots
+with the shot meter visible. Studio measures the bright fill against the gray sides
+of the meter. If two meters appear before tracking starts, the add-on keeps looking
+for a single meter. It can learn a sweep that first becomes visible partway up,
+using the fill positions it sees. When the trial ends, it saves those measurements.
+Assistance can use them on the first shot after
+a restart with the same profile, capture source, and resolution. Each new shot must
+show matching meter movement before Studio schedules the upstroke.
 
 The meter forecast compares linear, logarithmic and quadratic progression models
 using causal held-out frames. Uncertainty includes image resolution, forecast

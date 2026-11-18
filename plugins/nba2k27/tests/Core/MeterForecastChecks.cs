@@ -4,6 +4,9 @@ internal static class MeterForecastChecks
 {
     internal static void Run()
     {
+        CheckObservedSweeps();
+        MeterLearningChecks.Run();
+        MeterUpstrokeChecks.Run();
         int qualified = 0, conservative = 0;
         // Causal rolling windows across different smooth meter curves and horizons.
         foreach (double exponent in new[] { 1d, 1.2, 1.45, 1.7, 2d })
@@ -32,5 +35,36 @@ internal static class MeterForecastChecks
         if (Math.Abs(near.Tau - 60) > .1 || far.Uncertainty <= near.Uncertainty)
             throw new Exception("Long-horizon model disagreement did not raise uncertainty.");
         Console.WriteLine($"SUCCESS Competing meter curves/horizons: {qualified} qualified forecasts, {conservative} conservative forecasts; long-horizon uncertainty.");
+    }
+
+    private static void CheckObservedSweeps()
+    {
+        var history = new NbaMeterSweepTiming(.75);
+        bool RunHold(double velocity, bool ambiguous = false)
+        {
+            history.BeginHold();
+            bool scheduled = false;
+            for (int ms = 0; ms <= 520; ms += 15)
+            {
+                double fill = Math.Min(1, .08 + velocity * ms);
+                var meter = new NbaMeterDetector.Measurement(new(.4,.4,.04,.12), fill, .96, 128, 800, 600)
+                    { MeasuredFill = true };
+                var estimate = history.Observe(meter, ambiguous && ms == 60, ms, trackingAcquired: ms > 0);
+                if (estimate is { Tau: > 120, Uncertainty: <= 12 })
+                {
+                    if (Math.Abs(ms + estimate.Tau - (.75 - .08) / velocity) > 12)
+                        throw new Exception("A prior sweep predicted the wrong target.");
+                    scheduled = true;
+                }
+            }
+            return scheduled;
+        }
+        if (RunHold(.002) || RunHold(.002) || !RunHold(.002))
+            throw new Exception("Two completed full sweeps are required to forecast a matching third shot.");
+        if (RunHold(.001) || RunHold(.002, ambiguous: true))
+            throw new Exception("An incompatible pace or ambiguous meter reused a previous shot.");
+        history.Reset();
+        if (history.CompletedSweeps != 0 || RunHold(.002))
+            throw new Exception("A new source inherited previous meter timing.");
     }
 }

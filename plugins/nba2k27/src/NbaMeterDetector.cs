@@ -10,16 +10,21 @@ internal interface INbaMeterDetector
 }
 
 /// <summary>CPU-only curved-meter geometry. Acquisition never consults a player, tag, court or neural model.</summary>
-internal sealed class NbaMeterDetector(NbaMeterSettings settings) : INbaMeterDetector
+internal sealed partial class NbaMeterDetector(NbaMeterSettings settings) : INbaMeterDetector
 {
     internal readonly record struct Measurement(VisionCrop Bounds, double Progress, double Score, double Height, double TargetX, double TargetY,
-        double Bow = 0, double End = 0, double Thickness = 0);
+        double Bow = 0, double End = 0, double Thickness = 0)
+    {
+        internal bool MeasuredFill { get; init; }
+        internal double? FillTopFromCap { get; init; }
+    }
     private bool[] _mask = [];
     private int[] _queue = [];
     private Measurement? _previous;
     private double _velocityX, _velocityY, _sessionHeight;
+    private bool _sessionMeasuredFill;
     private int _emptyOutlineStreak, _sessionShiftCount;
-    private readonly record struct Cap(double X, double Y, double Width, int Area);
+    private readonly record struct Cap(double X, double Y, double Width, int Area, int Left, int Top, int Right, int Bottom);
     public bool Ambiguous { get; private set; }
     public void Reset() { _previous = null; _velocityX = _velocityY = 0; _emptyOutlineStreak = 0; Ambiguous = false; }
     public void ResetSession() { Reset(); _sessionHeight = 0; _sessionShiftCount = 0; }
@@ -62,7 +67,8 @@ internal sealed class NbaMeterDetector(NbaMeterSettings settings) : INbaMeterDet
                 _previous = found;
                 if (found.Progress >= .25 && found.Score >= .80)
                 {
-                    if (_sessionHeight <= 0) { _sessionHeight = found.Height; _sessionShiftCount = 0; }
+                    if (_sessionHeight <= 0 || found.MeasuredFill != _sessionMeasuredFill)
+                    { _sessionHeight = found.Height; _sessionMeasuredFill = found.MeasuredFill; _sessionShiftCount = 0; }
                     else if (found.Height / _sessionHeight is > .80 and < 1.20)
                     {
                         _sessionHeight = _sessionHeight * .85 + found.Height * .15;
@@ -117,7 +123,9 @@ internal sealed class NbaMeterDetector(NbaMeterSettings settings) : INbaMeterDet
             }
             double w=(maxX-minX+1)*step,h=(maxY-minY+1)*step;
             if(tail<2 || tail>Math.Max(400,height*height*.0003) || w>height*.045 || h>height*.035 || Math.Max(w,h)<height*.003)continue;
-            caps.Add(new(left+sumX/tail*step,top+sumY/tail*step,Math.Sqrt(w*w+h*h),tail));
+            caps.Add(new(left+sumX/tail*step,top+sumY/tail*step,Math.Sqrt(w*w+h*h),tail,
+                Math.Max(0,left+minX*step-step+1),Math.Max(0,top+minY*step-step+1),
+                Math.Min(width-1,left+maxX*step+step-1),Math.Min(height-1,top+maxY*step+step-1)));
         }
         Measurement? best=null;double second=0;
         bool hasReliablePrior = _previous is { } priorState && priorState.Progress >= .15;
@@ -169,25 +177,37 @@ internal sealed class NbaMeterDetector(NbaMeterSettings settings) : INbaMeterDet
                         Bounds=new(l,t,Math.Min(tracked.Bounds.Width,1-l),Math.Min(tracked.Bounds.Height,1-t)) };
                 }
             }
+            if (ReadCurvedFill(pixels, width, height, stride, cap, targetHue) is { } filled) candidate = filled;
             if(candidate is not { } value || value.Score<.55)continue;
             bool sameMeter = best is { } current && SameCap(value,current);
             if(best is null || value.Score>best.Value.Score){if(!sameMeter)second=best?.Score??0;best=value;}else if(!sameMeter)second=Math.Max(second,value.Score);
         }
         if(best is { } found && second>found.Score-.06){Ambiguous=true;return null;}
         if(best is not { } selected)return null;
-        double referenceHeight = hasReliablePrior && _previous is { } previous && Math.Abs(selected.TargetX - previous.TargetX) < width * .08 && Math.Abs(selected.TargetY - previous.TargetY) < height * .08
-            && selected.Height / previous.Height is > .75 and < 1.25
-            ? previous.Height
-            : (_sessionHeight > 0 && selected.Height / _sessionHeight is > .80 and < 1.20 ? _sessionHeight : 0);
+        double referenceHeight = 0;
+        if (_previous is { } previous && previous.MeasuredFill == selected.MeasuredFill
+            && (hasReliablePrior || previous.MeasuredFill) && Math.Abs(selected.TargetX - previous.TargetX) < width * .08
+            && Math.Abs(selected.TargetY - previous.TargetY) < height * .08 && selected.Height / previous.Height is > .75 and < 1.25)
+            referenceHeight = previous.Height;
+        else if (_sessionHeight > 0 && selected.MeasuredFill == _sessionMeasuredFill && selected.Height / _sessionHeight is > .80 and < 1.20)
+            referenceHeight = _sessionHeight;
         if (referenceHeight > 0)
+            selected = StabilizeHeight(selected, referenceHeight, height);
+        return selected.MeasuredFill ? selected : selected with { Progress = Progress(pixels,width,height,stride,selected) };
+    }
+    internal static Measurement StabilizeHeight(Measurement meter, double previousHeight, int pictureHeight)
+    {
+        // Stabilize the rail length only. The leading edge comes from this frame, so
+        // a changing patch of color at the bottom cannot delay real fill movement.
+        double height = previousHeight * .85 + meter.Height * .15;
+        double scale = height / meter.Height;
+        double bottom = Math.Min(pictureHeight, meter.TargetY + height + meter.Thickness);
+        return meter with
         {
-            // A one-pixel cap-edge change must not rescale the entire meter on every frame or between shots.
-            double stableHeight = referenceHeight * .85 + selected.Height * .15, scale = stableHeight / selected.Height;
-            double t = selected.Bounds.Top * height, b = Math.Min(height, selected.TargetY + stableHeight + selected.Thickness);
-            selected = selected with { Height = stableHeight, Bow = selected.Bow * scale, End = selected.End * scale,
-                Bounds = selected.Bounds with { Height = (b - t) / height } };
-        }
-        return selected with { Progress = Progress(pixels,width,height,stride,selected) };
+            Height = height, Bow = meter.Bow * scale, End = meter.End * scale,
+            Bounds = meter.Bounds with { Height = bottom / pictureHeight - meter.Bounds.Top },
+            Progress = meter.FillTopFromCap is { } leadingEdge ? CurvedProgress(height, leadingEdge) : meter.Progress
+        };
     }
     private static bool SameCap(Measurement a,Measurement b)
     {

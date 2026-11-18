@@ -14,6 +14,7 @@ internal sealed record Nba2K27ShotProfile(Guid Id, string Name, int HeightInches
     string MeterReleaseType = "", int ShotSpeed = 4, int Release1Percent = 50, string CameraView = "2K", string Gamertag = "") : IVisionCaptureProfile
 {
     public string AnalysisPolicy => "identity-pose-multicolor-floor-v3";
+    [JsonIgnore] internal string? MeterTimingDirectory { get; init; }
 
     public const int MaximumProfiles = 64;
     public const int MinimumHeightInches = 36;

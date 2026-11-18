@@ -8,6 +8,9 @@ internal sealed class NbaMeterPredictor(Nba2K27ShotProfile profile, NbaMeterSett
     INbaMeterDetector? detector = null) : IVisionLivePredictor
 {
     private readonly INbaMeterDetector _detector = detector ?? new NbaMeterDetector(configuration);
+    private readonly NbaMeterSweepTiming _sweepTiming = new(configuration.TargetProgress);
+    private readonly NbaMeterTimingStore? _timingStore = profile.MeterTimingDirectory is { } directory
+        ? new(directory, profile.Id, configuration.TuningContextKey(profile, settings)) : null;
     private readonly (double Time, double Progress)[] _history = new (double, double)[8];
     private int _count, _width, _height;
     private long _holdStart, _hostHoldStart, _lastCapture, _lastDetection, _hostShotToken, _generation = -1;
@@ -36,7 +39,13 @@ internal sealed class NbaMeterPredictor(Nba2K27ShotProfile profile, NbaMeterSett
         if (width <= 0 || height <= 0 || stride < width * 4 || bgra.Length < checked(stride * height))
             throw new InvalidDataException("The meter predictor needs a complete BGRA frame.");
         if (_generation != generation || _width != width || _height != height)
-        { Reset(); _generation = generation; _width = width; _height = height; }
+        {
+            Reset();
+            _generation = generation;
+            _width = width;
+            _height = height;
+            if (_timingStore is not null) _sweepTiming.Restore(_timingStore.Load(width, height));
+        }
         bool freshInput = context.InputTimestamp > 0 && captureTicks - context.InputTimestamp < Stopwatch.Frequency / 10
             && context.InputTimestamp - captureTicks < Stopwatch.Frequency / 10;
         if (!freshInput) return Fail("Physical input timing is stale or unavailable. Return to neutral.");
@@ -59,12 +68,7 @@ internal sealed class NbaMeterPredictor(Nba2K27ShotProfile profile, NbaMeterSett
         else if (physicalStart > 0 && _hostHoldStart == 0) _holdStart = _hostHoldStart = physicalStart;
         if (context.Armed && physicalStart == 0)
             return Fail("Shot trigger timing is unavailable. Release the trigger before the next attempt.");
-        if (_attemptFailure is { } failure) return Observation(failure, invalidate: true);
-        if (_hostShotToken > 0 && context.ShotToken == 0)
-        {
-            _lastCapture = captureTicks;
-            return Observation("Controller action ended. Check controller status and return to neutral.");
-        }
+        bool actionEnded = _hostShotToken > 0 && context.ShotToken == 0;
         if (context.ShotToken > 0) _hostShotToken = context.ShotToken;
         if (_lastCapture > 0 && (captureTicks <= _lastCapture || (captureTicks - _lastCapture) * 1000d / Stopwatch.Frequency > 70))
             return Fail("Frame cadence broke. Return to neutral before the next attempt.");
@@ -72,19 +76,24 @@ internal sealed class NbaMeterPredictor(Nba2K27ShotProfile profile, NbaMeterSett
         double heldMs = Math.Max(0, (captureTicks - _holdStart) * 1000d / Stopwatch.Frequency);
         if (captureTicks < _holdStart || heldMs < configuration.HoldMs) return Observation("Qualifying the shot trigger hold.");
         if (heldMs > settings.MaximumShotDurationMs) return Fail("Shot expired. Release the shot trigger before the next shot.");
-        if (!_acquired && heldMs > configuration.AcquisitionWindowMs + settings.EstimatedVideoDelayMs)
-            return Fail("No new meter appeared inside the input acquisition window. Return to neutral.");
         bool anchored = context.StrokeAnchorTimestamp > 0 && captureTicks >= context.StrokeAnchorTimestamp;
         var measured = _detector.Detect(bgra, width, height, stride);
+        var sweep = _sweepTiming.Observe(measured, _detector.Ambiguous, captureTicks * 1000d / Stopwatch.Frequency,
+            trackingAcquired: _acquired || _forecasted);
+        if (_attemptFailure is { } failure) return Observation(failure, invalidate: true);
+        if (actionEnded) return Observation("Controller action ended. Check controller status and return to neutral.");
+        if (!_acquired && heldMs > configuration.AcquisitionWindowMs + settings.EstimatedVideoDelayMs)
+            return Fail("No new meter appeared inside the input acquisition window. Return to neutral.");
         if (_detector.Ambiguous)
             return _acquired || _forecasted ? Fail("Multiple meters made tracking ambiguous. Return to neutral.")
                 : Observation("Searching for one unambiguous meter.");
+        if (_last is { MeasuredFill:true } && measured is { MeasuredFill:false }) measured=null;
         if (measured is not { } meter)
         {
             if (_forecasted && anchored && _last?.Progress >= .5)
                 return ContinueStroke("Meter is no longer visible after the timing anchor; finishing the committed stroke.");
             if (_forecasted) return Fail("Meter tracking was lost before the timing anchor. Return to neutral.");
-            _count = 0;
+            if (_last is not { MeasuredFill:true }) _count = 0;
             if (!_acquired) _sawPreShotClear = true;
             if (_last is { } missedLast && (captureTicks - _lastDetection) * 1000d / Stopwatch.Frequency > IdentityGraceMs)
             {
@@ -144,6 +153,7 @@ internal sealed class NbaMeterPredictor(Nba2K27ShotProfile profile, NbaMeterSett
         double span = _history[_count - 1].Time - _history[0].Time;
         if (_count < 4 || span < MinimumVelocityWindowMs) return Observation("Measuring the meter's fill velocity.", meter);
         var forecast = NbaMeterForecast.Predict(_history, _count, configuration.TargetProgress, meter.Height, _curvedMeter);
+        if (sweep is { Tau: >=0 } && (forecast is null || sweep.Uncertainty < forecast.Uncertainty)) forecast=sweep;
         double velocity = forecast?.Velocity ?? 0;
         if (forecast is null)
         {
@@ -171,7 +181,22 @@ internal sealed class NbaMeterPredictor(Nba2K27ShotProfile profile, NbaMeterSett
                 return UnforecastedCompletion(meter, velocity);
             // Withhold updates during fit noise. The host requires a recent valid forecast
             // at stroke start; noisy frames do not refresh that deadline's freshness.
-            return Observation("Waiting for a stable forecast inside the configured uncertainty limit.", meter, velocity, confidence, uncertainty);
+            string message=meter.MeasuredFill && _sweepTiming.CompletedSweeps<2
+                ? $"Learning this meter's timing ({_sweepTiming.CompletedSweeps} of 2 completed sweeps). Keep the trial running."
+                : "Waiting for a stable forecast inside the configured uncertainty limit.";
+            return Observation(message, meter, velocity, confidence, uncertainty);
+        }
+        // An accelerating fit can briefly put the target in the past while the fill
+        // is still near the bottom. Sending that estimate would cancel the physical
+        // hold permanently. Allow the next real frame to establish a usable estimate.
+        if (meter.MeasuredFill && sweep is null && Action.Kind == VisionActionKind.RightStickStroke
+            && context.StrokeAnchorTimestamp == 0 && meter.Progress < configuration.TargetProgress * .8)
+        {
+            double minimumLead = settings.EstimatedVideoDelayMs + settings.EstimatedInputDelayMs - settings.CorrectionMs
+                + Action.AnchorTimeFraction * configuration.EffectiveStrokeMs(settings) - settings.MaximumLatenessMs;
+            if (tau < minimumLead)
+                return Observation("The meter is still filling. Waiting for a prediction with time for the full upstroke.",
+                    meter, velocity, confidence, uncertainty);
         }
         _forecasted = true;
         return Observation("Meter fill forecast ready.", meter, velocity, confidence, uncertainty, tau);
@@ -205,11 +230,22 @@ internal sealed class NbaMeterPredictor(Nba2K27ShotProfile profile, NbaMeterSett
     }
     private void ClearAttempt()
     {
+        _sweepTiming.BeginHold();
         _count = 0; _forecasted = _acquired = _curvedMeter = _sawPreShotClear = false; _last = null; _lastCapture = _lastDetection = 0;
         _attemptFailure = null; _bestConfidence = 0; _hostShotToken = 0;
         _bestUncertainty = double.PositiveInfinity;
         _detector.Reset();
     }
-    public void Reset() { ClearAttempt(); _held = false; _holdStart = _hostHoldStart = 0; (_detector as NbaMeterDetector)?.ResetSession(); }
+    public void Reset()
+    {
+        if (_sweepTiming.HasNewSweeps) _timingStore?.Save(_width, _height, _sweepTiming.Snapshot());
+        ClearAttempt();
+        _sweepTiming.Reset();
+        _held = false;
+        _holdStart = _hostHoldStart = 0;
+        _generation = -1;
+        _width = _height = 0;
+        (_detector as NbaMeterDetector)?.ResetSession();
+    }
     public void Dispose() => Reset();
 }

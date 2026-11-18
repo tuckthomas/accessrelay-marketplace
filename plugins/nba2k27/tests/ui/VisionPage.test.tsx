@@ -119,7 +119,7 @@ describe('vision workflows', () => {
   it('retains a native-validated source selection and requires fresh layout confirmation before recording', async () => {
     const command = vi.fn().mockResolvedValue(null), state = fixture();
     const view = render(<VisionPage mode="training" state={state} status={null} command={command} />);
-    selectValue(screen.getByRole('combobox', { name: 'Gameplay window' }), 'window-two');
+    selectValue(screen.getByRole('combobox', { name: 'Capture source' }), 'window-two');
     await waitFor(() => expect(command).toHaveBeenCalledWith('sourceSelect', { id: 'window-two' }));
     view.rerender(<VisionPage mode="training" state={{ ...state, selectedSourceId: 'window-two', settings: { ...state.settings,
       trainingCapture: { ...state.settings.trainingCapture, configured: false } } }} status={state.status} command={command} />);
@@ -131,7 +131,7 @@ describe('vision workflows', () => {
   it('keeps the source picker usable while refreshing its window list on focus', () => {
     const command = vi.fn(() => new Promise(() => {}));
     render(<VisionPage mode="training" state={fixture()} status={null} command={command} />);
-    const picker = screen.getByRole('combobox', { name: 'Gameplay window' }) as HTMLSelectElement;
+    const picker = screen.getByRole('combobox', { name: 'Capture source' }) as HTMLButtonElement;
     fireEvent.focus(picker);
     expect(command).toHaveBeenCalledWith('sourceRefresh');
     expect(picker.disabled).toBe(false);
@@ -144,8 +144,8 @@ describe('vision workflows', () => {
     expect((screen.getByRole('button', { name: 'Record training clip' }) as HTMLButtonElement).disabled).toBe(false);
     view.rerender(<VisionPage mode="training" state={state} status={{ selectedSourceId: '', sources: [state.sources[1]], captureLayoutConfirmed: false,
       notice: 'The selected window closed.' }} command={command} />);
-    expect((screen.getByRole('combobox', { name: 'Gameplay window' }) as HTMLSelectElement).value).toBe('');
-    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Gameplay window' }), { key: 'ArrowDown' });
+    expect((screen.getByRole('combobox', { name: 'Capture source' }) as HTMLButtonElement).value).toBe('');
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Capture source' }), { key: 'ArrowDown' });
     expect(screen.queryByRole('option', { name: 'Xbox Remote Play' })).toBeNull();
     expect(screen.getByRole('option', { name: 'Another Remote Play window' })).toBeTruthy();
     fireEvent.keyDown(screen.getByRole('option', { name: 'Another Remote Play window' }), { key: 'Escape' });

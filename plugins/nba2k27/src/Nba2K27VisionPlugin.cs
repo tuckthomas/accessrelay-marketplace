@@ -21,11 +21,16 @@ internal sealed class Nba2K27VisionPlugin : IVisionGamePlugin, IGameControllerPl
     internal Nba2K27VisionPlugin(string? directory = null)
     {
         _store = new(directory);
-        _profiles = _store.LoadAll().ToArray();
+        _profiles = LoadProfiles();
         if (_store.LoadSelectedId() is Guid id) _selected = _profiles.FirstOrDefault(profile => profile.Id == id);
     }
 
-    public void SelectProfile(Guid id) { _selected = _store.Load(id); _store.Select(id); }
+    public void SelectProfile(Guid id)
+    {
+        var selected = _store.Load(id) with { MeterTimingDirectory = _store.DirectoryPath };
+        _store.Select(id);
+        _selected = selected;
+    }
 
     public IVisionCaptureProfile SaveProfile(JsonElement data, string expectedFingerprint)
     {
@@ -48,9 +53,12 @@ internal sealed class Nba2K27VisionPlugin : IVisionGamePlugin, IGameControllerPl
     public void DeleteProfile(Guid id)
     {
         _store.Delete(id); Reload(); if (_selected?.Id == id) _selected = null;
+        NbaMeterTimingStore.DeleteProfile(_store.DirectoryPath, id);
     }
 
-    private void Reload() => _profiles = _store.LoadAll().ToArray();
+    private Nba2K27ShotProfile[] LoadProfiles() =>
+        _store.LoadAll().Select(profile => profile with { MeterTimingDirectory = _store.DirectoryPath }).ToArray();
+    private void Reload() => _profiles = LoadProfiles();
 
     public (StudioProfile Profile, object Result) ApplyControllerAction(StudioProfile profile, string action, JsonElement args)
     {

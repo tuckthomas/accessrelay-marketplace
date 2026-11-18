@@ -111,7 +111,7 @@ function AnimationWorkspace({ state = {}, status, command, mode, captureWindow }
   const job = s.trainingJob ?? state.trainingJob ?? {};
   const working = !!busy || !!s.busy || job.state === 'running', context = !!profile && !!selectedSourceId, ready = (s.captureLayoutConfirmed ?? !!state?.settings?.trainingCapture?.configured) && (mode !== 'training' || ['automatic', 'anchored'].includes(state?.settings?.trainingCapture?.evidenceMode));
   const gpuPreparation = settings.preprocessingBackend === 'd3D11Cuda';
-  const recordHint = !profile ? 'Choose a saved shot profile first.' : !selectedSourceId ? (s.xbox?.direct ? 'Connect your Xbox first.' : 'Choose the Gameplay window first.') : !ready ? 'Detect the NBA capture areas before recording.' : saving ? 'The previous clip is finishing.' : working ? 'Another vision action is finishing.' : 'Save up to 10 seconds of gameplay and controller input.';
+  const recordHint = !profile ? 'Choose a saved shot profile first.' : !selectedSourceId ? (s.xbox?.direct ? 'Connect your Xbox first.' : 'Choose a capture source first.') : !ready ? 'Detect the NBA capture areas before recording.' : saving ? 'The previous clip is finishing.' : working ? 'Another vision action is finishing.' : 'Save up to 10 seconds of gameplay and controller input.';
   useEffect(() => { if (!dirty) setSettings(state?.settings ?? {}); }, [state?.settings, dirty]);
   useEffect(() => setReview(state?.review), [state?.review]);
   const seenProposal = useRef('');

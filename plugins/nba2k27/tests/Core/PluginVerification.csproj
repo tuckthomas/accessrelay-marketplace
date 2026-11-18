@@ -5,4 +5,5 @@
     <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup><ProjectReference Include="../../accessrelay.nba2k27.csproj" /></ItemGroup>
+  <ItemGroup><None Update="Fixtures/meter-upstroke-timings.json" CopyToOutputDirectory="PreserveNewest" /></ItemGroup>
 </Project>
