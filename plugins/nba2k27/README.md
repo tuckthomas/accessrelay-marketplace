@@ -1,7 +1,7 @@
 # NBA 2K27 implementation
 
-The Marketplace catalog includes NBA 2K27 version 2.1.6. The add-on requires runtime
-contract 4, which ships with AccessRelay Studio 1.9.0-beta.49.
+The Marketplace catalog includes NBA 2K27 version 2.1.9. The add-on requires runtime
+contract 5 from the [paired Studio change](https://github.com/tuckthomas/accessrelay-studio/pull/4).
 
 The [Windows shot meter replay](../../docs/nba2k27-meter-color-replay.md) measures full-frame
 delivery and compares P4 upstroke timing with CPU and GPU color conversion.
@@ -36,6 +36,12 @@ Xbox PC app's stream telemetry was not found. Automatic timing learning also req
 repeated reliable results in the same distance/coverage context. Use separate saved
 profiles for different contexts. Tempo changes require practice revalidation.
 
+
+### Rhythm shot controls
+
+Choose **Shooting input → Rhythm** and then **Shot trigger**. A face button, bumper, trigger, D-pad direction, stick click, Menu, View, Elite paddle or stick direction can start the automatic downstroke and upstroke. The manual right-stick hold is also available. A left-stick direction assigned as the trigger still steers the player. Existing P4 and manual-stick profiles keep their bindings.
+
+New attempt records and graded feedback include the physical and composed left-stick values from the trigger press. Graded feedback also includes the elapsed time to the submitted upstroke start when available. The training clip’s shot category is a user-supplied label.
 
 ## Direct meter assistance (1.2.12; Studio beta.38+)
 

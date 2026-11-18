@@ -50,16 +50,14 @@ internal sealed class NbaMeterPredictor(Nba2K27ShotProfile profile, NbaMeterSett
         bool freshInput = context.InputTimestamp > 0 && captureTicks - context.InputTimestamp < Stopwatch.Frequency / 10
             && context.InputTimestamp - captureTicks < Stopwatch.Frequency / 10;
         if (!freshInput) return Fail("Physical input timing is stale or unavailable. Return to neutral.");
-        bool usingPaddle = configuration.InputMode == "rhythm" && Action.TriggerPaddle != PaddleButtons.None;
+        bool assigned = Action.HasAssignedTrigger;
         bool held = freshInput && context.Physical is { } input && (configuration.InputMode == "rhythm"
-            ? (usingPaddle
-                ? (context.HeldPaddles & Action.TriggerPaddle) == Action.TriggerPaddle
-                : input.RightY <= -Action.AxisThreshold && Math.Abs((int)input.RightX) < Action.AxisThreshold)
+            ? Action.IsTriggerHeld(input, context.HeldPaddles)
             : (input.Buttons & (ushort)settings.ShootButton) != 0);
         if (!held)
         {
             bool invalid = _forecasted; ClearAttempt(); _held = false; _holdStart = _hostHoldStart = 0;
-            return Observation(usingPaddle ? "Waiting for your paddle hold." : "Waiting for your shoot hold.", invalidate: invalid);
+            return Observation(assigned ? "Waiting for your assigned shot control." : "Waiting for your shoot hold.", invalidate: invalid);
         }
         long physicalStart = context.HoldStartedTimestamp > 0 && context.HoldStartedTimestamp <= context.InputTimestamp
             ? context.HoldStartedTimestamp : 0;
