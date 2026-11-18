@@ -129,9 +129,77 @@ internal sealed class NbaMeterSweepTiming(double target)
             _sampleCount--;
         }
         _samples[_sampleCount++] = (time, meter.Progress);
-        if (_completed.Count < 2 || _sampleCount < 5 || time - _samples[0].Time < 75
-            || meter.Progress - _samples[0].Progress < .15 * target) return null;
-        return Match(meter, time);
+        if (_completed.Count < 2 || _sampleCount < 4 || time - _samples[0].Time < 48 ||
+            meter.Progress - _samples[0].Progress < .12 * target) return null;
+        return MatchPace(meter, time) ?? Match(meter, time);
+    }
+
+    // For each plausible pace every measured edge must support the SAME target time.
+    // Keep the whole surviving interval, including disagreement between reference sweeps.
+    private NbaMeterForecast.Estimate? MatchPace(NbaMeterDetector.Measurement meter, double time)
+    {
+        const double minScale = .92, maxScale = 1.08;
+        double earliest = double.PositiveInfinity, latest = double.NegativeInfinity;
+        double velocitySum = 0;
+        int references = 0;
+        Span<double> remaining = stackalloc double[_sampleCount];
+        Span<double> tolerance = stackalloc double[_sampleCount];
+        foreach (var sweep in _completed)
+        {
+            int first = 0;
+            while (first < _sampleCount && _samples[first].Progress < sweep.Levels[0] * target) first++;
+            if (_sampleCount - first < 4 || time - _samples[first].Time < 48 ||
+                meter.Progress - _samples[first].Progress < .12 * target) continue;
+            double velocity = 0;
+            bool inRange = true;
+            for (int i = first; i < _sampleCount; i++)
+            {
+                double level = _samples[i].Progress / target;
+                if (level < sweep.Levels[0] || level >= 1) { inRange = false; break; }
+                int end = 1;
+                while (end < sweep.Levels.Length - 1 && level > sweep.Levels[end]) end++;
+                velocity = target * (sweep.Levels[end] - sweep.Levels[end - 1]) / (sweep.Times[end] - sweep.Times[end - 1]);
+                double phase = sweep.Times[end - 1] + (_samples[i].Progress - target * sweep.Levels[end - 1]) / velocity;
+                remaining[i] = sweep.Times[^1] - phase;
+                // One pixel in either direction, expressed in milliseconds at the slowest permitted pace.
+                tolerance[i] = Math.Max(1.5, maxScale / (meter.Height * .9 * velocity));
+            }
+            if (!inRange || velocity is < .00015 or > .03) continue;
+
+            // Deadline(t) = sample.Time + scale * remaining(t), +/- the edge tolerance.
+            // Pairwise intersection bounds the continuous scale interval without a discretization error.
+            double low = minScale, high = maxScale;
+            for (int i = first; i < _sampleCount; i++)
+            for (int j = first; j < i; j++)
+            {
+                double delta = remaining[j] - remaining[i];
+                double elapsed = _samples[i].Time - _samples[j].Time;
+                double noise = tolerance[i] + tolerance[j];
+                if (Math.Abs(delta) < 1e-8)
+                {
+                    if (elapsed > noise) low = double.PositiveInfinity;
+                    continue;
+                }
+                double a = (elapsed - noise) / delta, b = (elapsed + noise) / delta;
+                low = Math.Max(low, Math.Min(a, b));
+                high = Math.Min(high, Math.Max(a, b));
+            }
+            if (low > high) continue;
+            double start = double.NegativeInfinity, endTime = double.PositiveInfinity;
+            for (int i = first; i < _sampleCount; i++)
+            {
+                start = Math.Max(start, _samples[i].Time + low * remaining[i] - tolerance[i]);
+                endTime = Math.Min(endTime, _samples[i].Time + high * remaining[i] + tolerance[i]);
+            }
+            earliest = Math.Min(earliest, start);
+            latest = Math.Max(latest, endTime);
+            velocitySum += velocity / ((low + high) / 2);
+            references++;
+        }
+        if (references < 2 || references * 2 <= _completed.Count) return null;
+        double radius = (latest - earliest) / 2;
+        if (radius > 8.5) return null;
+        return new((earliest + latest) / 2 - time, velocitySum / references, radius, radius, "pace-aligned meter sweeps");
     }
 
     private NbaMeterForecast.Estimate? Match(NbaMeterDetector.Measurement meter, double time)

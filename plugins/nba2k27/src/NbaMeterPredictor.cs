@@ -155,8 +155,9 @@ internal sealed class NbaMeterPredictor(Nba2K27ShotProfile profile, NbaMeterSett
         if (_count == _history.Length) { Array.Copy(_history, 1, _history, 0, _history.Length - 1); _count--; }
         _history[_count++] = (captureTicks * 1000d / Stopwatch.Frequency, meter.Progress);
         double span = _history[_count - 1].Time - _history[0].Time;
-        if (_count < 4 || span < MinimumVelocityWindowMs) return Observation("Measuring the meter's fill velocity.", meter);
-        var forecast = NbaMeterForecast.Predict(_history, _count, configuration.TargetProgress, meter.Height, _curvedMeter);
+        bool canFitVelocity = _count >= 4 && span >= MinimumVelocityWindowMs;
+        if (_count < 4 || (!canFitVelocity && sweep is null)) return Observation("Measuring the meter's fill velocity.", meter);
+        var forecast = canFitVelocity ? NbaMeterForecast.Predict(_history, _count, configuration.TargetProgress, meter.Height, _curvedMeter) : null;
         if (sweep is { Tau: >=0 } && (forecast is null || sweep.Uncertainty < forecast.Uncertainty)) forecast=sweep;
         double velocity = forecast?.Velocity ?? 0;
         if (forecast is null)
