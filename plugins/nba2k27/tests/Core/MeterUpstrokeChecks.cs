@@ -50,10 +50,14 @@ internal static class MeterUpstrokeChecks
             throw new Exception("Meter timing was missing or crossed a profile, source or resolution boundary.");
 
         var pixels = new byte[width * height * 4];
+        foreach (string activation in new[] { "hold", "tap" })
         foreach (var shot in fixture.Shots)
         {
             var detector = new Detector();
-            using var predictor = new NbaMeterPredictor(profile, config, settings, detector);
+            var selected = config with { Activation = activation };
+            if (!selected.Accepted(profile, settings) || selected.TuningContextKey(profile, settings) != context)
+                throw new Exception("Changing activation lost the confirmed calibration or saved sweeps.");
+            using var predictor = new NbaMeterPredictor(profile, selected, settings, detector);
             var arbiter = new ControllerOutputArbiter(Stopwatch.Frequency);
             arbiter.Configure(settings, predictor.Action);
             arbiter.BeginSession();
@@ -63,11 +67,13 @@ internal static class MeterUpstrokeChecks
             long poll = origin, step = (long)(Stopwatch.Frequency * .002), sequence = 0;
             double? lead = null;
             bool down = false, up = false;
+            PaddleButtons HeldAt(long t) => activation == "hold" || t - origin < Stopwatch.Frequency / 100
+                ? PaddleButtons.LargeRight : PaddleButtons.None;
             void PollThrough(long timestamp)
             {
                 while (poll <= timestamp)
                 {
-                    var output = arbiter.Sample(default, default, true, true, false, poll, poll, PaddleButtons.LargeRight);
+                    var output = arbiter.Sample(default, default, true, true, false, poll, poll, HeldAt(poll));
                     arbiter.RecordOutputSubmitted(output, poll);
                     down |= output.RightY == short.MinValue;
                     up |= output.RightY == short.MaxValue;
@@ -84,8 +90,8 @@ internal static class MeterUpstrokeChecks
                 detector.Meter = new(new(sample[5], sample[6], .025, sample[4] / height), sample[1], sample[2], sample[4],
                     sample[5] * width, sample[6] * height, Bow: .1) { MeasuredFill = true };
                 var signal = predictor.Observe(pixels, width, height, width * 4, ++sequence, 1, capture,
-                    new(default(ControllerState), capture, before.SessionGeneration, before.ShotToken, origin, true)
-                    { HoldStartedTimestamp = origin, HeldPaddles = PaddleButtons.LargeRight, StrokeAnchorTimestamp = arbiter.StrokeAnchorTimestamp });
+                    new(default(ControllerState), decision, before.SessionGeneration, before.ShotToken, before.ShotStartedTimestamp, true)
+                    { HoldStartedTimestamp = arbiter.HoldStartedTimestamp, HeldPaddles = HeldAt(decision), StrokeAnchorTimestamp = arbiter.StrokeAnchorTimestamp });
                 if (!predictor.CanArm) throw new Exception("Saved practice results did not enable assistance.");
                 if (before.ShotToken == 0 || !(signal.HasDecision)) continue;
                 bool accepted = arbiter.Submit(new(before.SessionGeneration, before.ShotToken, sequence, capture, decision,
@@ -111,7 +117,7 @@ internal static class MeterUpstrokeChecks
             if (shot.TargetMs is { } original && Math.Abs(target - original) > settings.MaximumUncertaintyMs)
                 throw new Exception($"{shot.Name}: the scheduled target shifted from {original:F1} to {target:F1} ms.");
             if (arbiter.Output.RightY != 0) throw new Exception("Right stick did not return to neutral.");
-            Console.WriteLine($"SUCCESS {shot.Name}: first forecast {lead:F1} ms ahead; native scheduler sent full up and neutral.");
+            Console.WriteLine($"SUCCESS {shot.Name} ({activation}): first forecast {lead:F1} ms ahead; native scheduler sent full up and neutral.");
         }
     }
 

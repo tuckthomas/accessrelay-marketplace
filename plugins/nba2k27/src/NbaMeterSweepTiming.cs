@@ -30,6 +30,7 @@ internal sealed class NbaMeterSweepTiming(double target)
     private NbaMeterDetector.Measurement? _previous;
     internal int CompletedSweeps => _completed.Count;
     internal bool HasNewSweeps { get; private set; }
+    internal bool Finished => _finished;
 
     internal void BeginHold(bool learn = true)
     {

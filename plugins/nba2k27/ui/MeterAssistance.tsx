@@ -2,7 +2,7 @@ import { React, useEffect, useRef, useState, Button, Card, Field, Input, Notice,
   ProfilePicker, GameplayPreview, Icon, Checkbox, useUnsavedChanges, type VisionWorkspaceProps } from './host.js';
 import { adjustMeterCalibration, successfulMeterResult } from './MeterCalibration.js';
 
-export const meterDefaults = { version: 1, enabled: true, inputMode: 'rhythm', trigger: 'largeRight', style: 'curved', viewport: { left: 0, top: 0, width: 1, height: 1 },
+export const meterDefaults = { version: 1, enabled: true, inputMode: 'rhythm', trigger: 'largeRight', activation: 'hold', style: 'curved', viewport: { left: 0, top: 0, width: 1, height: 1 },
   targetRed: 80, targetGreen: 210, targetBlue: 95, colorToleranceDegrees: 30, holdMs: 70, acquisitionWindowMs: 800, strokeDurationMs: 56, anchorFraction: .85,
   upHoldMs: 48, targetProgress: .75, smoothStroke: false, autoOcrTiming: true, calibrationTrial: false, confirmed: false, gameBuild: '', results: [], calibratedWidth: 0, calibratedHeight: 0 };
 export function meterArguments(configuration: any, settings: any) {
@@ -20,7 +20,7 @@ const triggerLabels: Record<string, string> = {
   leftUp: 'Left stick up', leftDown: 'Left stick down', leftLeft: 'Left stick left', leftRight: 'Left stick right',
   rightUp: 'Right stick up', rightDown: 'Right stick down', rightLeft: 'Right stick left', rightRight: 'Right stick right',
   largeRight: 'P4 · Large right paddle', largeLeft: 'P3 · Large left paddle',
-  smallRight: 'P2 · Small right paddle', smallLeft: 'P1 · Small left paddle', physicalStick: 'Manual right-stick down hold' };
+  smallRight: 'P2 · Small right paddle', smallLeft: 'P1 · Small left paddle', physicalStick: 'Physical right-stick down' };
 const timingOptions = [['early', 'Early'], ['slightlyEarly', 'Slightly early'], ['excellent', 'Excellent'], ['slightlyLate', 'Slightly late'], ['late', 'Late']];
 const tempoOptions = [['none', 'No tempo shown'], ['fast', 'Fast'], ['slightlyFast', 'Slightly fast'], ['excellent', 'Excellent'], ['slightlySlow', 'Slightly slow'], ['slow', 'Slow']];
 const initialConfig = (s: any) => {
@@ -183,6 +183,10 @@ export function MeterAssistance({ state = {}, status, command, captureWindow, ed
   }, [signature, matching]);
   const edit = (key: string, value: any) => { setConfig((old: any) => ({ ...old, [key]: value })); setDirty(true); };
   const editTiming = (key: string, value: number) => { setTiming((old: any) => ({ ...old, [key]: value })); setDirty(true); };
+  function changeActivation(value: string) {
+    if (dirty || !profile) edit('activation', value);
+    else void save({ ...config, activation: value }, !!session.running).catch(() => {});
+  }
   async function save(next = config, restart = false) {
     if (appliedAdjustment.current) appliedAdjustment.current = { correctionMs: timing.correctionMs ?? 0, strokeDurationMs: next.strokeDurationMs };
     await run('signalConfigure', { ...meterArguments(next, timing), restart }); setConfig(next); setDirty(false);
@@ -304,6 +308,10 @@ export function MeterAssistance({ state = {}, status, command, captureWindow, ed
     return <Field key={key} label={label} info={info}><Input type="number" min={min} max={max} step={step} value={config[key]}
       disabled={working || !!output.armed} onChange={e => edit(key, e.target.value === '' ? NaN : +e.target.value)} /></Field>;
   }
+  const directional = config.inputMode === 'rhythm' && (config.trigger === 'physicalStick' || /^(left|right)(Up|Down|Left|Right)$/.test(config.trigger));
+  const activationHelp = config.activation === 'tap'
+    ? directional ? 'Push the stick in the assigned direction once. You can center it immediately.' : 'Tap the assigned control once. You can release it immediately.'
+    : 'Hold the assigned control through the shot.';
   return <div className="page-stack meter-workflow"><style>{styles}</style>
     <Card title="Profile presets" description="Save separate calibrated presets for different modes or jumpshots and switch live."><div className="meter-profile-row">
       <ProfilePicker label="Shot profile" value={profile?.id ?? ''} disabled={switchingBlocked}
@@ -315,12 +323,15 @@ export function MeterAssistance({ state = {}, status, command, captureWindow, ed
         <SelectOption value="rhythm">Rhythm · right stick</SelectOption><SelectOption value="button">Shoot button</SelectOption></Select></Field>
       {config.inputMode === 'rhythm' && <Field label="Shot trigger"><Select value={config.trigger ?? 'largeRight'} disabled={locked || working} onValueChange={v => edit('trigger', v)}>
         {Object.entries(triggerLabels).map(([value, label]) => <SelectOption key={value} value={value}>{label}</SelectOption>)}</Select></Field>}
+      <Field label="Shot activation"><Select value={config.activation} disabled={working || !!output.armed || !!s.stopping || (!!diagnostic && !diagnostic.isFinalized)} onValueChange={changeActivation}>
+        <SelectOption value="tap">{directional ? 'Push once' : 'Tap once'}</SelectOption>
+        <SelectOption value="hold">Hold through shot</SelectOption></Select></Field>
     </div>{copying && profile && <div className="meter-profile-row meter-copy-row">
       <Field label="New profile name"><Input value={copyName} maxLength={80} autoFocus placeholder="For example, MyCourt, Rec, or Park" onChange={e => setCopyName(e.target.value)} /></Field>
       <Button variant="primary" disabled={switchingBlocked || !copyName.trim()} busy={busy === 'profileDuplicate'} onClick={() => { void duplicateProfile(); }}>Save copy</Button>
       <Button disabled={working} onClick={() => setCopying(false)}>Cancel</Button>
     </div>}{profile && <p className="subtle meter-profile-summary">{profile.cameraView} camera · {profile.meterReleaseType || 'Release cue not set'} · {profile.usesShotMeter ? 'Meter on' : 'Meter off'}</p>}
-    {config.inputMode === 'rhythm' && (config.trigger ?? 'largeRight') !== 'physicalStick' && <p className="subtle meter-profile-summary">{paddleTriggers.includes(config.trigger ?? 'largeRight') && 'Map the selected paddle to its PC Profile Numpad key in Xbox Accessories. '}Hold the assigned control through the shot. Studio generates the full downstroke and upstroke.</p>}</Card>
+    <p className="subtle meter-profile-summary">{config.inputMode === 'rhythm' && paddleTriggers.includes(config.trigger) && 'Map the selected paddle to its PC Profile Numpad key in Xbox Accessories. '}{activationHelp}</p></Card>
     <Card title="Xbox stream statistics" description={s.xbox?.direct ? 'Studio reads network and decoder statistics from the active Xbox stream.' : 'Enable the statistics overlay in the Xbox app so Studio can read it during window capture.'}>
       <p role="status">{s.streamTelemetry?.message || 'Statistics will appear when gameplay capture starts.'}</p>
       {s.streamTelemetryReader && <p className="subtle">{s.streamTelemetryReader}</p>}
@@ -368,7 +379,8 @@ export function MeterAssistance({ state = {}, status, command, captureWindow, ed
         {adjustmentFailed && dirty && <Button disabled={working || !!output.armed} onClick={() => { void save(config, true).catch(() => {}); }}>Retry adjustment</Button>}
         {!output.armed && !awaitingFeedback && <p role="status">{nextStep}</p>}
         {output.armed ? <div className="stack"><Notice tone="info">{accepted ? 'Meter assistance is on.'
-          : config.inputMode === 'rhythm' && (config.trigger ?? 'largeRight') !== 'physicalStick'
+          : config.activation === 'tap' || config.inputMode === 'button' ? `Take one stationary shot. ${activationHelp}`
+          : (config.trigger ?? 'largeRight') !== 'physicalStick'
             ? `Take one stationary shot. Hold ${triggerLabels[config.trigger ?? 'largeRight'] ?? 'the assigned control'} down through the automatic reversal, then release it.${['rightUp', 'rightDown', 'rightLeft', 'rightRight'].includes(config.trigger) ? '' : ' Keep the right stick centered.'}`
             : 'Take one stationary shot. Hold the right stick down through the automatic reversal, then return to neutral.'}</Notice>
           {output.message && <p role="status">{output.message}</p>}
@@ -431,7 +443,7 @@ export function MeterAssistance({ state = {}, status, command, captureWindow, ed
         {number('Stroke duration · ms', 'strokeDurationMs', 8, 500, 1, 'How fast the virtual right stick flips from down to up for a rhythm shot. Lower = faster tempo; higher = slower tempo.')}
         {number('Timing anchor · axis fraction', 'anchorFraction', 0, 1, .05, 'Point along the stick flip that counts as your release timing point (0.5 = center crossing; 0.85 = near full-up).')}
         {number('Full-up hold · ms', 'upHoldMs', 0, 500, 1, 'How long the virtual stick stays held at full-up after flipping so NBA 2K27 reliably registers the finish.')}
-        {number('Hold qualification · ms', 'holdMs', 0, 250, 1, 'How long you must hold the assigned shot control before meter tracking locks onto a shot. Prevents quick accidental taps from firing.')}
+        {config.activation === 'hold' && number('Hold qualification · ms', 'holdMs', 0, 250, 1, 'How long you must hold the assigned shot control before meter tracking starts.')}
         {number('Target fill', 'targetProgress', .7, 1.1, .01, 'How full the shot meter reaches (for example, 0.75 = 75%) before triggering the reversal so it finishes inside the green window after stream delay.')}
         <Field label="Stroke curve" info="How the stick moves during the flip. Linear moves at constant speed; Smooth eases in and out like a thumbstick motion."><Select value={config.smoothStroke ? 'smooth' : 'linear'} disabled={working || !!output.armed} onValueChange={v => edit('smoothStroke', v === 'smooth')}>
           <SelectOption value="linear">Linear</SelectOption><SelectOption value="smooth">Smooth</SelectOption></Select></Field>

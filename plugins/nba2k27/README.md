@@ -1,6 +1,6 @@
 # NBA 2K27 implementation
 
-NBA 2K27 version 2.1.11 uses Studio beta.51 or later. Shot meter reads the distance alongside each shot grade and shows it in the feedback log. You can move around the court and keep the same shot profile.
+NBA 2K27 version 2.1.12 uses Studio beta.52 or later. Choose **Shot activation** in Shot meter to tap your assigned control once or hold it through the shot. A bound stick direction offers **Push once**. The choice is saved per shot profile and uses its existing calibration.
 
 The [Windows shot meter replay](../../docs/nba2k27-meter-color-replay.md) measures full-frame
 delivery and compares P4 upstroke timing with CPU and GPU color conversion.

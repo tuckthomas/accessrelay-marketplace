@@ -13,6 +13,7 @@ internal sealed record NbaMeterSettings
     public bool Enabled { get; init; }
     public string InputMode { get; init; } = "rhythm";
     public string Trigger { get; init; } = "largeRight";
+    public string Activation { get; init; } = "hold";
     public string Style { get; init; } = "curved";
     public VisionCrop Viewport { get; init; } = new(0, 0, 1, 1);
     public int TargetRed { get; init; } = 80;
@@ -55,7 +56,7 @@ internal sealed record NbaMeterSettings
     internal void Validate()
     {
         Viewport.Validate();
-        if (Version != 1 || InputMode is not ("button" or "rhythm")
+        if (Version != 1 || InputMode is not ("button" or "rhythm") || Activation is not ("tap" or "hold")
             || (Trigger is null || (Trigger != "physicalStick" && !Controls.ContainsKey(Trigger) && !Directions.ContainsKey(Trigger)))
             || Style != "curved"
             || TargetRed is < 0 or > 255 || TargetGreen is < 0 or > 255 || TargetBlue is < 0 or > 255
@@ -103,8 +104,11 @@ internal sealed record NbaMeterSettings
     {
         Kind = InputMode == "rhythm" ? VisionActionKind.RightStickStroke : VisionActionKind.ButtonRelease,
         TriggerControl = InputMode == "rhythm" && Controls.TryGetValue(Trigger, out var control) ? control : null,
-        TriggerDirection = InputMode == "rhythm" && Directions.TryGetValue(Trigger, out var direction) ? direction : null,
-        HoldQualificationMs = HoldMs, StrokeDurationMs = StrokeDurationMs, AnchorFraction = AnchorFraction, EndHoldMs = UpHoldMs,
+        TriggerDirection = InputMode != "rhythm" ? null : Directions.TryGetValue(Trigger, out var direction) ? direction
+            : Trigger == "physicalStick" && Activation == "tap" ? StickDirection.RightDown : null,
+        ContinueAfterTriggerRelease = Activation == "tap",
+        HoldQualificationMs = Activation == "tap" ? 0 : HoldMs,
+        StrokeDurationMs = StrokeDurationMs, AnchorFraction = AnchorFraction, EndHoldMs = UpHoldMs,
         Curve = SmoothStroke ? VisionStrokeCurve.Smoothstep : VisionStrokeCurve.Linear, ConfigurationKey = Key(profile, settings)
     };
     private static bool Between(double value, double low, double high) => double.IsFinite(value) && value >= low && value <= high;

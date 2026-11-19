@@ -51,16 +51,26 @@ internal sealed class NbaMeterPredictor(Nba2K27ShotProfile profile, NbaMeterSett
             && context.InputTimestamp - captureTicks < Stopwatch.Frequency / 10;
         if (!freshInput) return Fail("Physical input timing is stale or unavailable. Return to neutral.");
         bool assigned = Action.HasAssignedTrigger;
-        bool held = freshInput && context.Physical is { } input && (configuration.InputMode == "rhythm"
-            ? Action.IsTriggerHeld(input, context.HeldPaddles)
-            : (input.Buttons & (ushort)settings.ShootButton) != 0);
+        bool tap = context.Armed && Action.ContinueAfterTriggerRelease;
+        // Finish measuring the same sweep if its target arrives after the host completed a tap.
+        if (tap && context.Physical.HasValue && context.ShotToken == 0 && _hostShotToken > 0 &&
+            _forecasted && _acquired && !_sweepTiming.Finished && captureTicks > _lastCapture &&
+            (captureTicks - _lastCapture) * 1000d / Stopwatch.Frequency <= settings.EstimatedVideoDelayMs + IdentityGraceMs)
+        {
+            var tail = _detector.Detect(bgra, width, height, stride);
+            _sweepTiming.Observe(tail, _detector.Ambiguous, captureTicks * 1000d / Stopwatch.Frequency, true);
+            return Observation("Controller action ended. Finishing the meter measurement.");
+        }
+        bool held = context.Physical is { } input && (tap ? context.ShotToken > 0 :
+            configuration.InputMode == "rhythm" ? Action.IsTriggerHeld(input, context.HeldPaddles)
+                : (input.Buttons & (ushort)settings.ShootButton) != 0);
         if (!held)
         {
             bool invalid = _forecasted; ClearAttempt(); _held = false; _holdStart = _hostHoldStart = 0;
             return Observation(assigned ? "Waiting for your assigned shot control." : "Waiting for your shoot hold.", invalidate: invalid);
         }
-        long physicalStart = context.HoldStartedTimestamp > 0 && context.HoldStartedTimestamp <= context.InputTimestamp
-            ? context.HoldStartedTimestamp : 0;
+        long transition = tap ? context.ShotStartedTimestamp : context.HoldStartedTimestamp;
+        long physicalStart = transition > 0 && transition <= context.InputTimestamp ? transition : 0;
         // A release/repress between video frames is still a new physical attempt.
         if (!_held || (physicalStart > 0 && _hostHoldStart > 0 && physicalStart != _hostHoldStart))
         { ClearAttempt(); _holdStart = physicalStart > 0 ? physicalStart : captureTicks; _hostHoldStart = physicalStart; _held = true; }
@@ -73,7 +83,8 @@ internal sealed class NbaMeterPredictor(Nba2K27ShotProfile profile, NbaMeterSett
             return Fail("Frame cadence broke. Return to neutral before the next attempt.");
         _lastCapture = captureTicks;
         double heldMs = Math.Max(0, (captureTicks - _holdStart) * 1000d / Stopwatch.Frequency);
-        if (captureTicks < _holdStart || heldMs < configuration.HoldMs) return Observation("Qualifying the shot trigger hold.");
+        if (captureTicks < _holdStart || heldMs < Action.HoldQualificationMs)
+            return Observation(tap ? "Waiting for a frame captured after the shot started." : "Qualifying the shot trigger hold.");
         if (heldMs > settings.MaximumShotDurationMs) return Fail("Shot expired. Release the shot trigger before the next shot.");
         bool anchored = context.StrokeAnchorTimestamp > 0 && captureTicks >= context.StrokeAnchorTimestamp;
         var measured = _detector.Detect(bgra, width, height, stride);

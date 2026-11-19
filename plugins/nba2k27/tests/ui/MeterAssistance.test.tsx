@@ -15,6 +15,25 @@ function fixture(overrides: any = {}) {
 }
 
 describe('meter calibration workflow', () => {
+  it.each([['largeRight', 'Tap once'], ['rightDown', 'Push once'], ['a', 'Tap once']])('saves and restores activation for %s', async (trigger, label) => {
+    const state = fixture(), command = vi.fn().mockResolvedValue(null);
+    Object.assign(state.settings.pluginAssistance, { trigger, confirmed: true });
+    const view = render(<Workspace mode="live" state={state} status={state.status} command={command} />);
+    const picker = () => screen.getByRole('combobox', { name: 'Shot activation' });
+    expect(picker().textContent).toContain('Hold through shot');
+    await selectValue(picker(), 'tap');
+    await waitFor(() => expect(command).toHaveBeenCalledWith('signalConfigure', expect.objectContaining({
+      configuration: expect.objectContaining({ trigger, activation: 'tap', confirmed: true }), restart: true })));
+    const persisted = command.mock.calls.find(([name]) => name === 'signalConfigure')![1].configuration;
+    view.unmount();
+    const saved = { ...state, settings: { ...state.settings, pluginAssistance: persisted } };
+    render(<Workspace mode="live" state={saved} status={saved.status} command={command} />);
+    expect(picker().textContent).toContain(label);
+    expect(screen.queryByRole('spinbutton', { name: /Hold qualification/ })).toBeNull();
+    await selectValue(picker(), 'hold');
+    await waitFor(() => expect(command).toHaveBeenCalledWith('signalConfigure', expect.objectContaining({
+      configuration: expect.objectContaining({ trigger, activation: 'hold', confirmed: true }) })));
+  });
   it('shows feedback from the shot HUD without asking for a distance or configuring output', () => {
     const command = vi.fn().mockResolvedValue(null), state = fixture();
     Object.assign(state.settings.pluginAssistance, { practiceDistanceFeet: 20 });

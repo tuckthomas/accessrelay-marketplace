@@ -62,7 +62,7 @@ for name, digest in expected.items():
     add(source, 'capture-models/' + name, 'captureModel')
 sources = sorted([* (PLUGIN / 'src').glob('*.cs'), * (PLUGIN / 'ui').glob('*.ts'), * (PLUGIN / 'ui').glob('*.tsx'), * (PLUGIN / 'training').glob('*.py')])
 provenance = target / 'data/source.json'
-provenance.write_text(json.dumps(dict(plugin='plugins/nba2k27', contractVersion=7,
+provenance.write_text(json.dumps(dict(plugin='plugins/nba2k27', contractVersion=8,
     sources={str(file.relative_to(ROOT)).replace('\\','/'): hashlib.sha256(file.read_bytes().replace(b'\r\n', b'\n')).hexdigest() for file in sources}), indent=2) + '\n', encoding='utf-8', newline='\n')
 add(provenance, 'data/source.json', 'data')
 controller_trainer = json.loads((PLUGIN / 'controller-trainer.json').read_text(encoding='utf-8'))
@@ -74,7 +74,7 @@ manifest = dict(
     trainingAdapter='nba2k27-training-v1', visionAdapter='temporal-release-v1',
     runtime=dict(
         assembly='runtime/accessrelay.nba2k27.dll', factory='EliteScriptStudio.Packs.Nba2K27.NbaPluginFactory', uiEntry='ui/index.js',
-        trainingEntry='training/Run-NbaTraining.py', modelDirectory='capture-models', contractVersion=7,
+        trainingEntry='training/Run-NbaTraining.py', modelDirectory='capture-models', contractVersion=8,
         auditEntry='training/Audit-VisionDataset.py', experimentsEntry='training/Run-VisionExperiments.py'
     ),
     controllerTrainer=controller_trainer,
