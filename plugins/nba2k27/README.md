@@ -1,6 +1,6 @@
 # NBA 2K27 implementation
 
-The Marketplace catalog includes NBA 2K27 version 2.1.10. It requires Studio beta.50 or later for runtime contract 6. Shot meter can learn from a solo practice HUD when you select the shooting distance under Feedback context.
+NBA 2K27 version 2.1.11 uses Studio beta.51 or later. Shot meter reads the distance alongside each shot grade and shows it in the feedback log. You can move around the court and keep the same shot profile.
 
 The [Windows shot meter replay](../../docs/nba2k27-meter-color-replay.md) measures full-frame
 delivery and compares P4 upstroke timing with CPU and GPU color conversion.

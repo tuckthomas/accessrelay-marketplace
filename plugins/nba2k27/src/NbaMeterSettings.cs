@@ -27,6 +27,8 @@ internal sealed record NbaMeterSettings
     public double TargetProgress { get; init; } = 1;
     public bool SmoothStroke { get; init; }
     public bool AutoOcrTiming { get; init; } = true;
+    // Accept the retired 2.1.10 field in strict JSON without carrying it into new saves.
+    [System.Text.Json.Serialization.JsonIgnore]
     public int? PracticeDistanceFeet { get; init; }
     public bool CalibrationTrial { get; init; }
     public bool Confirmed { get; init; }
@@ -54,7 +56,6 @@ internal sealed record NbaMeterSettings
     {
         Viewport.Validate();
         if (Version != 1 || InputMode is not ("button" or "rhythm")
-            || (PracticeDistanceFeet is { } feet && (feet is < 0 or > 90 || feet % 5 != 0))
             || (Trigger is null || (Trigger != "physicalStick" && !Controls.ContainsKey(Trigger) && !Directions.ContainsKey(Trigger)))
             || Style != "curved"
             || TargetRed is < 0 or > 255 || TargetGreen is < 0 or > 255 || TargetBlue is < 0 or > 255

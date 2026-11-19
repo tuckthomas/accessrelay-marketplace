@@ -15,16 +15,16 @@ function fixture(overrides: any = {}) {
 }
 
 describe('meter calibration workflow', () => {
-  it('shows a reader failure and saves the chosen solo range without arming output', async () => {
+  it('shows feedback from the shot HUD without asking for a distance or configuring output', () => {
     const command = vi.fn().mockResolvedValue(null), state = fixture();
+    Object.assign(state.settings.pluginAssistance, { practiceDistanceFeet: 20 });
     render(<Workspace mode="live" state={state} status={{ ...state.status,
+      ocrFeedback: { message: 'Timing held.', distance: "26'7" },
       ocrReaderStatus: 'Shot feedback reader unavailable. Capture model integrity check failed: text-det.onnx' }} command={command} />);
     expect(screen.getByText(/integrity check failed: text-det.onnx/)).toBeTruthy();
-    await selectValue(screen.getByRole('combobox', { name: 'Feedback context' }), '20');
-    await waitFor(() => expect(command).toHaveBeenCalledWith('signalConfigure', expect.objectContaining({
-      configuration: expect.objectContaining({ practiceDistanceFeet: 20 }), restart: true
-    })));
-    expect(command.mock.calls.some(([action]) => action === 'armedSet')).toBe(false);
+    expect(screen.getByText(/26'7/)).toBeTruthy();
+    expect(screen.queryByRole('combobox', { name: 'Feedback context' })).toBeNull();
+    expect(command).not.toHaveBeenCalled();
   });
   it('shows actual stream readings without configuring or arming output, and marks missing measurements unavailable', () => {
     const command = vi.fn(), state = fixture();

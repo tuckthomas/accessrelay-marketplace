@@ -154,6 +154,9 @@ internal static class MeterChecks
     }
     internal static void Calibration()
     {
+        var legacy = NbaMeterSettings.Parse(JsonSerializer.SerializeToElement(new { confirmed = true, trigger = "largeRight", practiceDistanceFeet = 20 }));
+        if (!legacy.Confirmed || legacy.Trigger != "largeRight" || legacy.Export().TryGetProperty("practiceDistanceFeet", out _))
+            throw new Exception("Loading a saved meter profile lost calibration or retained the retired distance choice.");
         var p = new Nba2K27ShotProfile(Guid.NewGuid(), "Fixture", 83, 91, "Base", "Upper 1", "Upper 2", true, "Push");
         var config = new NbaMeterSettings { Trigger = "physicalStick", Enabled = true, GameBuild = "2.0.0.12", CalibrationTrial = true };
         var settings = VisionSettings.Default with { CaptureSourceKey = "fixture-source" };

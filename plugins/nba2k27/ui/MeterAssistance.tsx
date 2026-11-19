@@ -398,17 +398,8 @@ export function MeterAssistance({ state = {}, status, command, captureWindow, ed
           <label className="meter-ocr-toggle"><Checkbox checked={config.autoOcrTiming !== false} disabled={working || !!output.armed}
             onChange={e => { const next = { ...config, autoOcrTiming: e.target.checked }; setConfig(next); if (profile) void save(next, true).catch(() => {}); }} />
             <span>Auto-adapt timing from shot feedback (OCR)</span></label>
-          {config.autoOcrTiming !== false && <Field label="Feedback context" info="Choose your shooting range for solo practice. Studio saves timing separately for each range and keeps your calibrated stroke duration.">
-            <Select value={config.practiceDistanceFeet == null ? 'multiplayer' : String(config.practiceDistanceFeet)}
-              disabled={working || !!output.armed} onValueChange={v => {
-                const next = { ...config, practiceDistanceFeet: v === 'multiplayer' ? null : Number(v) };
-                setConfig(next); if (profile) void save(next, true).catch(() => {});
-              }}>
-              <SelectOption value="multiplayer">Multiplayer · require defender coverage</SelectOption>
-              {Array.from({ length: 19 }, (_, i) => i * 5).map(feet => <SelectOption key={feet} value={String(feet)}>Solo practice · {feet}–{feet + 4} ft</SelectOption>)}
-            </Select></Field>}
-          {s.ocrReaderStatus && <p role="status">{s.ocrReaderStatus}{config.practiceDistanceFeet != null && typeof s.ocrEffectiveTimingMs === 'number'
-            ? ` Practice timing ${fmt(s.ocrEffectiveTimingMs)} ms.` : ''}</p>}
+          {s.ocrReaderStatus && <p role="status">{s.ocrReaderStatus}{typeof s.ocrEffectiveTimingMs === 'number'
+            ? ` Current timing correction ${fmt(s.ocrEffectiveTimingMs)} ms.` : ''}</p>}
           {!accepted && <label className="meter-ocr-toggle"><Checkbox checked={autoSubmitPractice} disabled={working || config.autoOcrTiming === false}
             onChange={e => setAutoSubmitPractice(e.target.checked)} />
             <span>Auto-save OCR practice results &amp; re-arm</span></label>}
