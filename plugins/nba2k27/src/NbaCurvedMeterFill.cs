@@ -42,11 +42,21 @@ internal sealed partial class NbaMeterDetector
             min=Math.Min(min,along); max=Math.Max(max,along);
         }
         double bar=max-min+1, side=Math.Sign(tilt), cx=cap.Left+sx, cy=cap.Top+sy;
+        double knownHeight = _sessionMeasuredFill ? _sessionHeight : 0;
         if (_previous is { MeasuredFill: true } prior && Math.Abs(cx-prior.TargetX)<width*.04 &&
-            Math.Abs(cy-prior.TargetY)<height*.04 && bar/prior.Thickness is >.8 and <1.25)
+            Math.Abs(cy-prior.TargetY)<height*.04 && bar/prior.Thickness is >.8 and <1.25 &&
+            Math.Sign(prior.Bow) == side)
+        {
             bar=.75*prior.Thickness+.25*bar;
+            knownHeight = prior.Height;
+        }
         double nominal=bar*8.2;
         if (nominal<height*.035 || nominal>height*.38 || cy+nominal*1.24>=height) return null;
+        // The colored portion of the tip can shrink while the two rails stay the same length.
+        // Locate the fill again at the current tip, using the measured length as the first fit.
+        if (knownHeight / nominal is > .80 and < 1.25 && cy + 1.24 * knownHeight < height &&
+            ReadRibbon(pixels, width, height, stride, cx, cy, side, bar, knownHeight, false, out _) is { } measured)
+            return measured;
         return ReadRibbon(pixels, width, height, stride, cx, cy, side, bar, nominal, verifyOutline: false, out _);
     }
 
@@ -100,10 +110,9 @@ internal sealed partial class NbaMeterDetector
                     body++;
                     if (verifyOutline)
                     {
-                        var outsideLeft = Pixel(pixels,width,height,stride,x-dx*.78,cy+row-dy*.78);
-                        var outsideRight = Pixel(pixels,width,height,stride,x+dx*.78,cy+row+dy*.78);
-                        if ((Math.Abs(outsideLeft.Luma-shade)>15 || outsideLeft.Chroma>30) &&
-                            (Math.Abs(outsideRight.Luma-shade)>15 || outsideRight.Chroma>30)) silhouetteRows++;
+                        if (OutsideRails(pixels, width, height, stride, x, cy + row, dx, dy, shade, .78) ||
+                            OutsideRails(pixels, width, height, stride, x, cy + row, dx, dy, shade, 1.15))
+                            silhouetteRows++;
                     }
                 }
             }
@@ -134,5 +143,16 @@ internal sealed partial class NbaMeterDetector
             double dx=bar/Math.Sqrt(1+slope*slope);
             return (cx+side*nominal*(.76*t*(1-t)-.07*t),dx,-slope*dx);
         }
+    }
+
+    // On a neutral court the meter's soft drop shadow can have the same shade as the rails.
+    // Both sides must separate at the same distance from the predicted curve.
+    private static bool OutsideRails(ReadOnlySpan<byte> pixels, int width, int height, int stride,
+        double x, double y, double dx, double dy, double shade, double radius)
+    {
+        var left = Pixel(pixels, width, height, stride, x - dx * radius, y - dy * radius);
+        var right = Pixel(pixels, width, height, stride, x + dx * radius, y + dy * radius);
+        return (Math.Abs(left.Luma - shade) > 15 || left.Chroma > 30) &&
+            (Math.Abs(right.Luma - shade) > 15 || right.Chroma > 30);
     }
 }

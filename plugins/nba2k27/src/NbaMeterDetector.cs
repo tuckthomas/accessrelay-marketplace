@@ -29,7 +29,7 @@ internal sealed partial class NbaMeterDetector(NbaMeterSettings settings) : INba
     public bool Ambiguous { get; private set; }
     public bool HasRailIdentity { get; private set; }
     private int _caplessFrames;
-    public void Reset() { HasRailIdentity = false; _caplessFrames = 0; _previous = null; _velocityX = _velocityY = 0; _emptyOutlineStreak = 0; Ambiguous = false; }
+    public void Reset() { HasRailIdentity = _grayNeedsClear = false; _caplessFrames = 0; _grayCandidate = _previous = null; _velocityX = _velocityY = 0; _emptyOutlineStreak = 0; Ambiguous = false; }
     public void ResetSession() { Reset(); _sessionHeight = 0; _sessionShiftCount = 0; }
 
     public Measurement? Detect(ReadOnlySpan<byte> pixels, int width, int height, int stride)
@@ -38,10 +38,13 @@ internal sealed partial class NbaMeterDetector(NbaMeterSettings settings) : INba
         HasRailIdentity = false;
         var search = _previous is { } last ? Expand(ShiftPredicted(last.Bounds, _velocityX, _velocityY), .6) : settings.Viewport;
         var result = Search(pixels, width, height, stride, search);
+        bool followingGray = _grayCandidate.HasValue && !Ambiguous && result is not { MeasuredFill: true };
+        if (followingGray)
+            result = FindGrayMeter(pixels, width, height, stride);
         if (!Ambiguous && result is not { MeasuredFill: true } &&
-            _previous is { MeasuredFill: true, Score: >= .78 } prior && _caplessFrames < 3)
+            _previous is { MeasuredFill: true } prior && _caplessFrames < 3)
         {
-            var recovered = TrackRibbon(pixels, width, height, stride, prior);
+            var recovered = TrackRibbon(pixels, width, height, stride, prior, result);
             if (HasRailIdentity)
             {
                 _caplessFrames++;
@@ -51,6 +54,10 @@ internal sealed partial class NbaMeterDetector(NbaMeterSettings settings) : INba
         }
         if (!HasRailIdentity && !Ambiguous && result is null && _previous is not null)
             result = Search(pixels, width, height, stride, settings.Viewport);
+        if (!followingGray && !HasRailIdentity && !Ambiguous && result is null)
+            result = FindGrayMeter(pixels, width, height, stride);
+        else if (!followingGray && !HasRailIdentity)
+            _grayCandidate = null;
         if (!HasRailIdentity && result is { MeasuredFill: true }) _caplessFrames = 0;
         // The predictor bounds how long identity may survive a missing detection.
         if (result is { } found)
@@ -107,13 +114,19 @@ internal sealed partial class NbaMeterDetector(NbaMeterSettings settings) : INba
         }
         return result;
     }
-    private Measurement? TrackRibbon(ReadOnlySpan<byte> pixels, int width, int height, int stride, Measurement prior)
+    private Measurement? TrackRibbon(ReadOnlySpan<byte> pixels, int width, int height, int stride, Measurement prior, Measurement? tip)
     {
         // The search is bounded by the last real cap and samples native-resolution pixels.
         // Check both the rails and their outer boundaries so a flat gray patch cannot hold identity.
         double dx = Math.Clamp(_velocityX * width, -prior.Thickness, prior.Thickness);
         double dy = Math.Clamp(_velocityY * height, -prior.Thickness, prior.Thickness);
-        double best = 0;
+        if (tip is { } current && Math.Abs(current.TargetX - prior.TargetX) < width * .04 &&
+            Math.Abs(current.TargetY - prior.TargetY) < height * .04)
+        {
+            dx = current.TargetX - prior.TargetX;
+            dy = current.TargetY - prior.TargetY;
+        }
+        double bestReading = 0;
         Measurement? result = null;
         double step = Math.Max(1, prior.Thickness * .18);
         foreach (double y in (ReadOnlySpan<double>)[0, -step, step])
@@ -121,11 +134,11 @@ internal sealed partial class NbaMeterDetector(NbaMeterSettings settings) : INba
         {
             var reading = ReadRibbon(pixels, width, height, stride, prior.TargetX + dx + x, prior.TargetY + dy + y,
                 Math.Sign(prior.Bow), prior.Thickness, prior.Height, verifyOutline: true, out double score);
-            if (score <= best) continue;
-            best = score;
-            result = reading is { } m ? StabilizeHeight(m, prior.Height, height) : null;
+            if (score > 0) HasRailIdentity = true;
+            if (reading is not { } m || score <= bestReading) continue;
+            bestReading = score;
+            result = StabilizeHeight(m, prior.Height, height);
         }
-        HasRailIdentity = best > 0;
         return result;
     }
 
@@ -148,18 +161,7 @@ internal sealed partial class NbaMeterDetector(NbaMeterSettings settings) : INba
         for (int start = 0; start < count; start++)
         {
             if (!_mask[start]) continue;
-            int head=0, tail=1, minX=start%columns,maxX=minX,minY=start/columns,maxY=minY;
-            double sumX=0,sumY=0; _queue[0]=start;_mask[start]=false;
-            while(head<tail)
-            {
-                int p=_queue[head++], x=p%columns,y=p/columns;sumX+=x;sumY+=y;
-                minX=Math.Min(minX,x);maxX=Math.Max(maxX,x);minY=Math.Min(minY,y);maxY=Math.Max(maxY,y);
-                for(int dy=-1;dy<=1;dy++)for(int dx=-1;dx<=1;dx++)
-                {
-                    int nx=x+dx,ny=y+dy;if(nx<0||nx>=columns||ny<0||ny>=rows)continue;
-                    int n=ny*columns+nx;if(_mask[n]){_mask[n]=false;_queue[tail++]=n;}
-                }
-            }
+            var (minX, maxX, minY, maxY, tail, sumX, sumY) = ReadComponent(start, columns, rows);
             double w=(maxX-minX+1)*step,h=(maxY-minY+1)*step;
             if(tail<2 || tail>Math.Max(400,height*height*.0003) || w>height*.045 || h>height*.035 || Math.Max(w,h)<height*.003)continue;
             caps.Add(new(left+sumX/tail*step,top+sumY/tail*step,Math.Sqrt(w*w+h*h),tail,
@@ -212,7 +214,7 @@ internal sealed partial class NbaMeterDetector(NbaMeterSettings settings) : INba
                 {
                     double dx=(cap.X-tracked.TargetX)/width,dy=(cap.Y-tracked.TargetY)/height;
                     double l=Math.Clamp(tracked.Bounds.Left+dx,0,1),t=Math.Clamp(tracked.Bounds.Top+dy,0,1);
-                    candidate=tracked with { TargetX=cap.X,TargetY=cap.Y,Score=score,
+                    candidate=tracked with { TargetX=cap.X,TargetY=cap.Y,Score=score, MeasuredFill=false, FillTopFromCap=null,
                         Bounds=new(l,t,Math.Min(tracked.Bounds.Width,1-l),Math.Min(tracked.Bounds.Height,1-t)) };
                 }
             }
@@ -233,6 +235,30 @@ internal sealed partial class NbaMeterDetector(NbaMeterSettings settings) : INba
         if (referenceHeight > 0)
             selected = StabilizeHeight(selected, referenceHeight, height);
         return selected.MeasuredFill ? selected : selected with { Progress = Progress(pixels,width,height,stride,selected) };
+    }
+    // The queued indices remain available to the caller until the next component.
+    private (int MinX, int MaxX, int MinY, int MaxY, int Count, double SumX, double SumY) ReadComponent(int start, int columns, int rows)
+    {
+        int head = 0, tail = 1, minX = start % columns, maxX = minX, minY = start / columns, maxY = minY;
+        double sumX = 0, sumY = 0;
+        _mask[start] = false;
+        _queue[0] = start;
+        while (head < tail)
+        {
+            int p = _queue[head++], x = p % columns, y = p / columns;
+            sumX += x; sumY += y;
+            minX = Math.Min(minX, x); maxX = Math.Max(maxX, x);
+            minY = Math.Min(minY, y); maxY = Math.Max(maxY, y);
+            for (int yy = Math.Max(0, y - 1); yy <= Math.Min(rows - 1, y + 1); yy++)
+            for (int xx = Math.Max(0, x - 1); xx <= Math.Min(columns - 1, x + 1); xx++)
+            {
+                int neighbor = yy * columns + xx;
+                if (!_mask[neighbor]) continue;
+                _mask[neighbor] = false;
+                _queue[tail++] = neighbor;
+            }
+        }
+        return (minX, maxX, minY, maxY, tail, sumX, sumY);
     }
     internal static Measurement StabilizeHeight(Measurement meter, double previousHeight, int pictureHeight)
     {

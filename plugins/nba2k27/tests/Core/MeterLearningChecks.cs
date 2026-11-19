@@ -10,6 +10,7 @@ internal static class MeterLearningChecks
     internal static void Run()
     {
         CheckWeakFrames();
+        CheckGrayAcquisition();
         string directory = Directory.CreateTempSubdirectory("nba-meter-learning-").FullName;
         try
         {
@@ -111,7 +112,49 @@ internal static class MeterLearningChecks
             throw new Exception("A new shot inherited the old cap.");
     }
 
-    private static void Render(byte[] pixels, double progress, bool twoMeters = false, bool capVisible = true, int shift = 0)
+    private static void CheckGrayAcquisition()
+    {
+        var pixels = new byte[Width * Height * 4];
+        foreach (bool mirror in new[] { false, true })
+        {
+            var detector = new NbaMeterDetector(new());
+            NbaMeterDetector.Measurement? Read(double progress, int shift = 0, bool two = false)
+            {
+                Render(pixels, progress, two, capVisible: false, shift: shift, mirror: mirror);
+                return detector.Detect(pixels, Width, Height, Width * 4);
+            }
+            for (int i = 0; i < 3; i++)
+                if (Read(.16) is not null) throw new Exception("A stationary gray shape acquired a shot.");
+            var found = Read(.23, 5);
+            if (found is not { MeasuredFill: true, Progress: > .17 and < .29 } || !detector.HasRailIdentity)
+                throw new Exception($"Moving gray meter failed to acquire from its own rails and advancing fill (mirror={mirror}): {found}.");
+            if (Read(.35, 16) is not { MeasuredFill: true, Progress: > .28 and < .42 })
+                throw new Exception("The gray meter lost its advancing fill as it moved.");
+            detector.Reset();
+            Read(.15, two: true);
+            if (Read(.25, two: true) is not null || !detector.Ambiguous)
+                throw new Exception("Two gray meters passed as one rising meter.");
+            detector.Reset();
+            if (Read(.9) is not null || Read(.94) is not null || Read(.39) is not null || Read(.45) is not null)
+                throw new Exception("A previous shot's nearly full gray meter acquired a new shot.");
+            Array.Fill(pixels, (byte)107);
+            detector.Detect(pixels, Width, Height, Width * 4);
+            if (Read(.16) is not null || Read(.25) is not { MeasuredFill: true })
+                throw new Exception("A new gray meter could not acquire after the previous one cleared.");
+        }
+
+        var colored = new NbaMeterDetector(new());
+        Render(pixels, .28);
+        var before = colored.Detect(pixels, Width, Height, Width * 4);
+        Render(pixels, .36, capHalfWidth: 6.5);
+        var after = colored.Detect(pixels, Width, Height, Width * 4);
+        if (before is not { MeasuredFill: true } || after is not { MeasuredFill: true, Progress: > .31 and < .41 } ||
+            Math.Abs(before.Value.Height - after.Value.Height) > 6)
+            throw new Exception("A shorter colored tip erased the new fill or changed the verified ribbon length.");
+    }
+
+    private static void Render(byte[] pixels, double progress, bool twoMeters = false, bool capVisible = true,
+        int shift = 0, bool mirror = false, double capHalfWidth = 8)
     {
         // The rails and the moving inner fill are rasterized independently of the detector.
         System.Runtime.InteropServices.MemoryMarshal.Cast<byte, uint>(pixels.AsSpan()).Fill(0xff262626);
@@ -123,9 +166,9 @@ internal static class MeterLearningChecks
             const int centerY = 145;
             const double bar = 17, length = 139;
             for (int y = centerY - 12; y <= centerY + length + 4; y++)
-            for (int x = centerX - 24; x <= centerX + 42; x++)
+            for (int x = centerX - 42; x <= centerX + 42; x++)
             {
-                double dx = x - centerX, dy = y - centerY, t = dy / length;
+                double dx = (x - centerX) * (mirror ? -1 : 1), dy = y - centerY, t = dy / length;
                 for (int i = 0; i < 3; i++)
                 {
                     double slope = .76 * (1 - 2 * t) - .07;
@@ -140,7 +183,7 @@ internal static class MeterLearningChecks
                     pixels[offset] = pixels[offset + 1] = pixels[offset + 2] = shade;
                     pixels[offset + 3] = 255;
                 }
-                if (capVisible && Math.Abs(dx * .8 - dy * .6) <= 8 && Math.Abs(dx * .6 + dy * .8) <= 2)
+                if (capVisible && Math.Abs(dx * .8 - dy * .6) <= capHalfWidth && Math.Abs(dx * .6 + dy * .8) <= 2)
                 {
                     pixels[offset] = 95; pixels[offset + 1] = 210; pixels[offset + 2] = 80; pixels[offset + 3] = 255;
                 }

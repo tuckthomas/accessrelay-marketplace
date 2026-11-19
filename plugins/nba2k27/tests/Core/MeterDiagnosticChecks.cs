@@ -6,7 +6,8 @@ using EliteScriptStudio.Packs.Nba2K27;
 
 internal static class MeterDiagnosticChecks
 {
-    internal static void Inspect(string directory, string output, string? referenceFile = null, bool useLoggedSignals = false, string? pixelReport = null)
+    internal static void Inspect(string directory, string output, string? referenceFile = null, bool useLoggedSignals = false,
+        string? pixelReport = null, double? effectiveCorrection = null, bool preferImages = false)
     {
         using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(directory, "diagnostic.json")));
         var root = document.RootElement; var context = root.GetProperty("context");
@@ -27,12 +28,13 @@ internal static class MeterDiagnosticChecks
             new NbaMeterTimingStore(dir, profile.Id, key).Save(rootRef.GetProperty("width").GetInt32(), rootRef.GetProperty("height").GetInt32(), sweeps);
         }
         var detector = new NbaMeterDetector(config);
-        using var pixelData = pixelReport is null ? null : JsonDocument.Parse(File.ReadAllBytes(pixelReport));
-        var observations = pixelData is null ? null : new RecordedMeterGeometry(pixelData.RootElement.GetProperty("rows"));
+        using var pixelData = pixelReport is null or "-" ? null : JsonDocument.Parse(File.ReadAllBytes(pixelReport));
+        var observations = pixelReport is null ? null : new RecordedMeterGeometry(pixelData?.RootElement.GetProperty("rows") ?? default, preferImages);
         using var predictor = new NbaMeterPredictor(profile, config, settings, observations);
         var arbiter = new ControllerOutputArbiter(Stopwatch.Frequency);
-        arbiter.Configure(settings, predictor.Action); arbiter.BeginSession();
-        var rows = new List<object>(); byte[] pixels = []; long timeline = 0; ControllerState previous = default;
+        arbiter.Configure(effectiveCorrection.HasValue ? settings with { CorrectionMs = effectiveCorrection.Value } : settings, predictor.Action);
+        arbiter.BeginSession();
+        var rows = new List<object>(); byte[] pixels = []; long timeline = 0, measuredToken = 0; ControllerState previous = default;
         PaddleButtons previousPaddles = PaddleButtons.None;
         var frames = root.GetProperty("frames").EnumerateArray().ToArray();
         foreach (var frame in frames)
@@ -55,11 +57,12 @@ internal static class MeterDiagnosticChecks
                 timeline += step;
                 bool newHold = original.HoldStartedTimestamp > 0 && timeline >= original.HoldStartedTimestamp;
                 var polled = newHold ? physical : previous;
-                arbiter.Sample(polled, polled, true, true, false, timeline, timeline, newHold ? original.HeldPaddles : previousPaddles);
+                arbiter.Sample(polled, polled, true, true, false, timeline, newHold ? original.HoldStartedTimestamp : timeline,
+                    newHold ? original.HeldPaddles : previousPaddles);
                 arbiter.RecordOutputSubmitted(arbiter.Output, timeline);
             }
             timeline = now; arbiter.Sample(physical, physical, true, true, false, now,
-                original.InputTimestamp, original.HeldPaddles);
+                original.HoldStartedTimestamp > 0 ? original.HoldStartedTimestamp : original.InputTimestamp, original.HeldPaddles);
             arbiter.RecordOutputSubmitted(arbiter.Output, now);
             previous = physical; previousPaddles = original.HeldPaddles;
             var before = arbiter.Status;
@@ -82,6 +85,9 @@ internal static class MeterDiagnosticChecks
                 {
                     observations.Read(frame, seq, w, h);
                     found = observations.Current;
+                    if (preferImages && pixelReport != "-" && !observations.HasObservation &&
+                        measuredToken != 0 && before.ShotToken == measuredToken) continue;
+                    if (found is { MeasuredFill: true }) measuredToken = before.ShotToken;
                 }
                 else
                 {
@@ -93,7 +99,8 @@ internal static class MeterDiagnosticChecks
                 }
                 var simulated = original with { Armed = true, SessionGeneration = before.SessionGeneration, ShotToken = before.ShotToken,
                     ShotStartedTimestamp = before.ShotStartedTimestamp, StrokeAnchorTimestamp = arbiter.StrokeAnchorTimestamp,
-                    MinimumStrokeLeadMs = arbiter.MinimumStrokeLeadMs + Stopwatch.GetElapsedTime(ticks, now).TotalMilliseconds };
+                    MinimumStrokeLeadMs = arbiter.MinimumStrokeLeadMs + Math.Max(0,
+                        Stopwatch.GetElapsedTime(ticks, now).TotalMilliseconds - frame.GetProperty("processingMs").GetDouble()) };
                 signal = predictor.Observe(pixels, w, h, stride, seq, frame.GetProperty("sourceGeneration").GetInt64(), ticks, simulated);
                 submit = signal.HasDecision;
             }
@@ -105,10 +112,10 @@ internal static class MeterDiagnosticChecks
                     { WithdrawPendingForecast = signal.WithdrawPendingForecast, ContinueCommittedAction = signal.ContinueCommittedAction && !signal.InvalidateAttempt,
                         TrackingFailure = signal.InvalidateAttempt ? signal.Message : null }, now);
             if (accepted && arbiter.StrokeStartDue(now) && arbiter.TryAdvanceDeadline(now)) arbiter.RecordOutputSubmitted(arbiter.Output, now);
-            rows.Add(new { seq, ticks, found, measuredFill = found?.MeasuredFill, rail = detector.HasRailIdentity, ambiguous = detector.Ambiguous, detectorMs, signal, accepted,
+            rows.Add(new { seq, ticks, found, measuredFill = found?.MeasuredFill, leadingEdge = found?.FillTopFromCap, rail = detector.HasRailIdentity, ambiguous = detector.Ambiguous, detectorMs, signal, accepted,
                 state = arbiter.Status, rightY = arbiter.Output.RightY, receipt = arbiter.LastAction, attempt = arbiter.LastAttempt, file = filename });
         }
-        File.WriteAllText(output, JsonSerializer.Serialize(new { scope = observations is not null ? "Predictor and controller replay of logged fill and position. Retained rail geometry supplements the log. For a missing image, the rail is estimated from its bounds and the last measured cap thickness." : useLoggedSignals ? "Controller-only replay of all recorded predictor submissions. Output is simulated." : "Device-free replay of retained diagnostic images with recorded physical input. Missing images stay missing. Output is simulated, never sent to Xbox.", rows },
+        File.WriteAllText(output, JsonSerializer.Serialize(new { scope = preferImages ? "Retained image measurements, supplemented only by observed geometry on frames without pixels. No controller is connected." : observations is not null ? "Predictor and controller replay of logged fill and position. Retained rail geometry supplements the log. For a missing image, the rail is estimated from its bounds and the last measured cap thickness." : useLoggedSignals ? "Controller-only replay of all recorded predictor submissions. Output is simulated." : "Device-free replay of retained diagnostic images with recorded physical input. Missing images stay missing. Output is simulated, never sent to Xbox.", rows },
             new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
         Console.WriteLine($"SUCCESS Replayed {rows.Count} {(useLoggedSignals || observations is not null ? "logged observations" : "retained images")} without controller output: {output}");
     }

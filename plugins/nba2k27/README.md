@@ -1,6 +1,6 @@
 # NBA 2K27 implementation
 
-NBA 2K27 version 2.1.12 uses Studio beta.52 or later. Choose **Shot activation** in Shot meter to tap your assigned control once or hold it through the shot. A bound stick direction offers **Push once**. The choice is saved per shot profile and uses its existing calibration.
+NBA 2K27 version 2.1.13 uses Studio beta.52 or later. Meter tracking follows the measured rails as the colored tip changes size and can acquire a gray meter from its rising fill. Choose **Shot activation** in Shot meter to tap your assigned control once or hold it through the shot. A bound stick direction offers **Push once**. The choice is saved per shot profile and uses its existing calibration.
 
 The [Windows shot meter replay](../../docs/nba2k27-meter-color-replay.md) measures full-frame
 delivery and compares P4 upstroke timing with CPU and GPU color conversion.

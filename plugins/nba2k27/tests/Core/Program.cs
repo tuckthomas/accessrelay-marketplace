@@ -8,11 +8,16 @@ if (args is ["--meter-diagnostic", var diagnosticDirectory, var diagnosticOutput
 { MeterDiagnosticChecks.Inspect(diagnosticDirectory, diagnosticOutput); return; }
 if (args is ["--meter-diagnostic", var directoryWithRefs, var outputWithRefs, var savedReferences])
 { MeterDiagnosticChecks.Inspect(directoryWithRefs, outputWithRefs, savedReferences); return; }
+if (args is ["--meter-diagnostic", var clip, var offsetReport, var refs, var correction])
+{ MeterDiagnosticChecks.Inspect(clip, offsetReport, refs, effectiveCorrection: double.Parse(correction, System.Globalization.CultureInfo.InvariantCulture)); return; }
 
 if (args is ["--meter-controller-replay", var fullDiagnostic, var controllerReport])
 { MeterDiagnosticChecks.Inspect(fullDiagnostic, controllerReport, useLoggedSignals: true); return; }
 if (args is ["--meter-observation-replay", var archive, var landmarks, var pixelReport, var observationReport])
 { MeterDiagnosticChecks.Inspect(archive, observationReport, landmarks, pixelReport: pixelReport); return; }
+if (args is ["--meter-tracking-replay", var trackClip, var trackRefs, var images, var trackReport, var offset])
+{ MeterDiagnosticChecks.Inspect(trackClip, trackReport, trackRefs, pixelReport: images, preferImages: true,
+    effectiveCorrection: double.Parse(offset, System.Globalization.CultureInfo.InvariantCulture)); return; }
 if (args is ["--meter-prefixes", var observed, var curves, var leadReport])
 { MeterPrefixChecks.Run(observed, curves, leadReport); return; }
 

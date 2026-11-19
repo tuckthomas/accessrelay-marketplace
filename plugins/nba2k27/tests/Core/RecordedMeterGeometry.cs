@@ -2,13 +2,15 @@ using System.Text.Json;
 using EliteScriptStudio.Core;
 using EliteScriptStudio.Packs.Nba2K27;
 
-internal sealed class RecordedMeterGeometry(JsonElement rows) : INbaMeterDetector
+internal sealed class RecordedMeterGeometry(JsonElement rows, bool preferImages = false) : INbaMeterDetector
 {
-    private readonly Dictionary<long, JsonElement> _images = rows.EnumerateArray().ToDictionary(r => r.GetProperty("seq").GetInt64());
+    private readonly Dictionary<long, JsonElement> _images = rows.ValueKind == JsonValueKind.Array
+        ? rows.EnumerateArray().ToDictionary(r => r.GetProperty("seq").GetInt64()) : [];
     private double? _thickness;
     internal NbaMeterDetector.Measurement? Current { get; private set; }
     public bool Ambiguous { get; private set; }
     public bool HasRailIdentity { get; private set; }
+    internal bool HasObservation { get; private set; }
     public NbaMeterDetector.Measurement? Detect(ReadOnlySpan<byte> pixels, int width, int height, int stride) => Current;
     public void Reset() { }
 
@@ -16,6 +18,7 @@ internal sealed class RecordedMeterGeometry(JsonElement rows) : INbaMeterDetecto
     {
         var live = frame.GetProperty("signal").Deserialize<VisionSignalObservation>(NbaMeterSettings.Json);
         Current = null; Ambiguous = false; HasRailIdentity = false;
+        HasObservation = false;
         if (_images.TryGetValue(seq, out var image))
         {
             Ambiguous = image.GetProperty("ambiguous").GetBoolean();
@@ -23,15 +26,25 @@ internal sealed class RecordedMeterGeometry(JsonElement rows) : INbaMeterDetecto
             if (image.GetProperty("found").ValueKind == JsonValueKind.Object)
             {
                 var edge = image.GetProperty("found").Deserialize<NbaMeterDetector.Measurement>(NbaMeterSettings.Json);
-                Current = edge with { MeasuredFill = image.GetProperty("measuredFill").ValueKind == JsonValueKind.True };
+                Current = edge with
+                {
+                    MeasuredFill = image.GetProperty("measuredFill").ValueKind == JsonValueKind.True,
+                    FillTopFromCap = image.TryGetProperty("leadingEdge", out var leading) && leading.ValueKind == JsonValueKind.Number
+                        ? leading.GetDouble() : null
+                };
+                _thickness = edge.Thickness;
             }
+            HasObservation = true;
+            if (preferImages) return;
         }
         if (live?.Region is not { } b)
         {
             if (live?.Message.Contains("rails tracked", StringComparison.OrdinalIgnoreCase) == true) HasRailIdentity = true;
             if (live?.Message.Contains("ambiguous", StringComparison.OrdinalIgnoreCase) == true && !live.Message.Contains("unambiguous")) Ambiguous = true;
+            HasObservation |= Ambiguous || HasRailIdentity;
             return;
         }
+        HasObservation = true;
         Ambiguous = false;
         if (Current is { } detected && Math.Abs(detected.Bounds.Left - b.Left) < .03 && Math.Abs(detected.Bounds.Top - b.Top) < .04)
         {
@@ -42,7 +55,18 @@ internal sealed class RecordedMeterGeometry(JsonElement rows) : INbaMeterDetecto
         double box = b.Height * h;
         // The detector's bounds include one cap width at each end of the rail.
         double thickness = Math.Clamp(_thickness ?? box / 10, box / 16, box / 9);
+        bool measured = live.Samples > 0;
+        if (preferImages)
+        {
+            // A measured ribbon has width .37 * length + two cap widths, and height
+            // length + two cap widths. Coarse green-outline fits have different bounds.
+            double length = (box - b.Width * w) / .63;
+            double cap = (box - length) / 2;
+            measured = measured && length > 0 && cap / length is >= .085 and <= .17;
+            if (measured) thickness = cap;
+            HasObservation = measured || _images.Count == 0;
+        }
         Current = new(b, live.Progress, live.Confidence, box - 2 * thickness, (b.Left + b.Width / 2) * w, b.Top * h + thickness,
-            Bow: thickness, Thickness: thickness) { MeasuredFill = live.Samples > 0 };
+            Bow: thickness, Thickness: thickness) { MeasuredFill = measured };
     }
 }
