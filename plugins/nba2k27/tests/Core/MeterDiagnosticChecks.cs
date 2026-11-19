@@ -6,15 +6,30 @@ using EliteScriptStudio.Packs.Nba2K27;
 
 internal static class MeterDiagnosticChecks
 {
-    internal static void Inspect(string directory, string output)
+    internal static void Inspect(string directory, string output, string? referenceFile = null, bool useLoggedSignals = false, string? pixelReport = null)
     {
         using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(directory, "diagnostic.json")));
         var root = document.RootElement; var context = root.GetProperty("context");
         var profile = context.GetProperty("selection").GetProperty("profile").Deserialize<Nba2K27ShotProfile>(NbaMeterSettings.Json)!;
         var settings = context.GetProperty("settings").Deserialize<VisionSettings>(NbaMeterSettings.Json)!;
-        var config = NbaMeterSettings.Read(settings) with { CalibrationTrial = true };
+        var config = NbaMeterSettings.Read(settings);
+        if (referenceFile is null) config = config with { CalibrationTrial = true };
+        else
+        {
+            using var cache = JsonDocument.Parse(File.ReadAllBytes(referenceFile));
+            string key = config.TuningContextKey(profile, settings);
+            var rootRef = cache.RootElement;
+            if (rootRef.GetProperty("contextKey").GetString() != key) throw new InvalidDataException("Sweep references belong to another capture or calibration.");
+            string dir = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(output))!, Path.GetFileName(output) + ".references");
+            profile = profile with { MeterTimingDirectory = dir };
+            var sweeps = rootRef.GetProperty("references").Deserialize<NbaMeterSweep[]>(NbaMeterSettings.Json)!;
+            if (!sweeps.All(NbaMeterSweep.IsValid) || sweeps.Length is < 2 or > 5) throw new InvalidDataException("Invalid sweep references.");
+            new NbaMeterTimingStore(dir, profile.Id, key).Save(rootRef.GetProperty("width").GetInt32(), rootRef.GetProperty("height").GetInt32(), sweeps);
+        }
         var detector = new NbaMeterDetector(config);
-        using var predictor = new NbaMeterPredictor(profile, config, settings);
+        using var pixelData = pixelReport is null ? null : JsonDocument.Parse(File.ReadAllBytes(pixelReport));
+        var observations = pixelData is null ? null : new RecordedMeterGeometry(pixelData.RootElement.GetProperty("rows"));
+        using var predictor = new NbaMeterPredictor(profile, config, settings, observations);
         var arbiter = new ControllerOutputArbiter(Stopwatch.Frequency);
         arbiter.Configure(settings, predictor.Action); arbiter.BeginSession();
         var rows = new List<object>(); byte[] pixels = []; long timeline = 0; ControllerState previous = default;
@@ -47,28 +62,54 @@ internal static class MeterDiagnosticChecks
                 original.InputTimestamp, original.HeldPaddles);
             arbiter.RecordOutputSubmitted(arbiter.Output, now);
             previous = physical; previousPaddles = original.HeldPaddles;
-            // Advance the physical timeline even when an image was dropped. Never fabricate its pixels.
-            if (!frame.TryGetProperty("file", out var image) || image.ValueKind != JsonValueKind.String) continue;
-            int w = frame.GetProperty("width").GetInt32(), h = frame.GetProperty("height").GetInt32(), stride = frame.GetProperty("stride").GetInt32();
-            int size = checked(stride * h); if (pixels.Length != size) pixels = new byte[size];
-            using (var gzip = new GZipStream(File.OpenRead(Path.Combine(directory, image.GetString()!)), CompressionMode.Decompress)) gzip.ReadExactly(pixels);
-            long began = Stopwatch.GetTimestamp();
-            var found = detector.Detect(pixels, w, h, stride); double detectorMs = Stopwatch.GetElapsedTime(began).TotalMilliseconds;
             var before = arbiter.Status;
-            var simulated = original with { Armed = true, SessionGeneration = before.SessionGeneration, ShotToken = before.ShotToken,
-                ShotStartedTimestamp = before.ShotStartedTimestamp, StrokeAnchorTimestamp = arbiter.StrokeAnchorTimestamp };
-            var signal = predictor.Observe(pixels, w, h, stride, seq, frame.GetProperty("sourceGeneration").GetInt64(), ticks, simulated);
+            VisionSignalObservation? signal;
+            NbaMeterDetector.Measurement? found = null;
+            double detectorMs = 0;
+            string? filename = null;
+            bool submit;
+            if (useLoggedSignals)
+            {
+                signal = frame.GetProperty("signal").Deserialize<VisionSignalObservation>(NbaMeterSettings.Json);
+                submit = frame.GetProperty("predictionSubmitted").GetBoolean();
+            }
+            else
+            {
+                // All input polls are replayed. A missing image contributes no new pixel inference.
+                int w = frame.GetProperty("width").GetInt32(), h = frame.GetProperty("height").GetInt32(), stride = frame.GetProperty("stride").GetInt32();
+                int size = checked(stride * h); if (pixels.Length != size) pixels = new byte[size];
+                if (observations is not null)
+                {
+                    observations.Read(frame, seq, w, h);
+                    found = observations.Current;
+                }
+                else
+                {
+                    if (!frame.TryGetProperty("file", out var image) || image.ValueKind != JsonValueKind.String) continue;
+                    filename = image.GetString()!;
+                    using (var gzip = new GZipStream(File.OpenRead(Path.Combine(directory, filename)), CompressionMode.Decompress)) gzip.ReadExactly(pixels);
+                    long began = Stopwatch.GetTimestamp();
+                    found = detector.Detect(pixels, w, h, stride); detectorMs = Stopwatch.GetElapsedTime(began).TotalMilliseconds;
+                }
+                var simulated = original with { Armed = true, SessionGeneration = before.SessionGeneration, ShotToken = before.ShotToken,
+                    ShotStartedTimestamp = before.ShotStartedTimestamp, StrokeAnchorTimestamp = arbiter.StrokeAnchorTimestamp,
+                    MinimumStrokeLeadMs = arbiter.MinimumStrokeLeadMs + Stopwatch.GetElapsedTime(ticks, now).TotalMilliseconds };
+                signal = predictor.Observe(pixels, w, h, stride, seq, frame.GetProperty("sourceGeneration").GetInt64(), ticks, simulated);
+                submit = signal.HasDecision;
+            }
             bool accepted = false;
-            if (before.ShotToken != 0 && (signal.TimeToTargetMs.HasValue || signal.InvalidateAttempt || signal.ContinueCommittedAction))
+            if (signal?.ForecastLimit is { } limit) arbiter.NoteForecastLimit(before.SessionGeneration, before.ShotToken, limit);
+            if (before.ShotToken != 0 && signal is not null && submit)
                 accepted = arbiter.Submit(new(before.SessionGeneration, before.ShotToken, seq, ticks, now, signal.TimeToTargetMs ?? 0,
                     signal.Confidence, signal.UncertaintyMs, signal.Acquired && !signal.InvalidateAttempt)
-                    { ContinueCommittedAction = signal.ContinueCommittedAction && !signal.InvalidateAttempt,
+                    { WithdrawPendingForecast = signal.WithdrawPendingForecast, ContinueCommittedAction = signal.ContinueCommittedAction && !signal.InvalidateAttempt,
                         TrackingFailure = signal.InvalidateAttempt ? signal.Message : null }, now);
-            rows.Add(new { seq, ticks, found, ambiguous = detector.Ambiguous, detectorMs, signal, accepted,
-                state = arbiter.Status, rightY = arbiter.Output.RightY, receipt = arbiter.LastAction, attempt = arbiter.LastAttempt, file = image.GetString() });
+            if (accepted && arbiter.StrokeStartDue(now) && arbiter.TryAdvanceDeadline(now)) arbiter.RecordOutputSubmitted(arbiter.Output, now);
+            rows.Add(new { seq, ticks, found, measuredFill = found?.MeasuredFill, rail = detector.HasRailIdentity, ambiguous = detector.Ambiguous, detectorMs, signal, accepted,
+                state = arbiter.Status, rightY = arbiter.Output.RightY, receipt = arbiter.LastAction, attempt = arbiter.LastAttempt, file = filename });
         }
-        File.WriteAllText(output, JsonSerializer.Serialize(new { scope = "Device-free replay of retained diagnostic images with recorded physical input. Missing images stay missing. Output is simulated, never sent to Xbox.", rows },
+        File.WriteAllText(output, JsonSerializer.Serialize(new { scope = observations is not null ? "Predictor and controller replay of logged fill and position. Retained rail geometry supplements the log. For a missing image, the rail is estimated from its bounds and the last measured cap thickness." : useLoggedSignals ? "Controller-only replay of all recorded predictor submissions. Output is simulated." : "Device-free replay of retained diagnostic images with recorded physical input. Missing images stay missing. Output is simulated, never sent to Xbox.", rows },
             new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
-        Console.WriteLine($"SUCCESS Inspected {rows.Count} retained diagnostic images without controller output: {output}");
+        Console.WriteLine($"SUCCESS Replayed {rows.Count} {(useLoggedSignals || observations is not null ? "logged observations" : "retained images")} without controller output: {output}");
     }
 }

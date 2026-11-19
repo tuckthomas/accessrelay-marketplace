@@ -1,7 +1,6 @@
 # NBA 2K27 implementation
 
-The Marketplace catalog includes NBA 2K27 version 2.1.9. The add-on requires runtime
-contract 5 from the [paired Studio change](https://github.com/tuckthomas/accessrelay-studio/pull/4).
+The Marketplace catalog includes NBA 2K27 version 2.1.10. It requires Studio beta.50 or later for runtime contract 6. Shot meter can learn from a solo practice HUD when you select the shooting distance under Feedback context.
 
 The [Windows shot meter replay](../../docs/nba2k27-meter-color-replay.md) measures full-frame
 delivery and compares P4 upstroke timing with CPU and GPU color conversion.

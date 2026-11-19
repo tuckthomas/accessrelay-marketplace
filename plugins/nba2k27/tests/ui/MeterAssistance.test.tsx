@@ -15,6 +15,17 @@ function fixture(overrides: any = {}) {
 }
 
 describe('meter calibration workflow', () => {
+  it('shows a reader failure and saves the chosen solo range without arming output', async () => {
+    const command = vi.fn().mockResolvedValue(null), state = fixture();
+    render(<Workspace mode="live" state={state} status={{ ...state.status,
+      ocrReaderStatus: 'Shot feedback reader unavailable. Capture model integrity check failed: text-det.onnx' }} command={command} />);
+    expect(screen.getByText(/integrity check failed: text-det.onnx/)).toBeTruthy();
+    await selectValue(screen.getByRole('combobox', { name: 'Feedback context' }), '20');
+    await waitFor(() => expect(command).toHaveBeenCalledWith('signalConfigure', expect.objectContaining({
+      configuration: expect.objectContaining({ practiceDistanceFeet: 20 }), restart: true
+    })));
+    expect(command.mock.calls.some(([action]) => action === 'armedSet')).toBe(false);
+  });
   it('shows actual stream readings without configuring or arming output, and marks missing measurements unavailable', () => {
     const command = vi.fn(), state = fixture();
     const view = render(<Workspace mode="live" state={state} status={{ ...state.status, streamTelemetry: { state: 'stable', message: 'Stream stable.',

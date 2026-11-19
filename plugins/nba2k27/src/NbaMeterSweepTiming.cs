@@ -25,16 +25,17 @@ internal sealed class NbaMeterSweepTiming(double target)
     private readonly double[] _crossings = new double[NbaMeterSweep.StandardLevels.Length];
     private readonly (double Time, double Progress)[] _samples = new (double, double)[12];
     private int _crossingCount, _nextLevel, _sampleCount, _readingCount;
-    private bool _finished;
+    private bool _finished, _canLearn = true;
     private double _highTime, _highProgress, _lastTime;
     private NbaMeterDetector.Measurement? _previous;
     internal int CompletedSweeps => _completed.Count;
     internal bool HasNewSweeps { get; private set; }
 
-    internal void BeginHold()
+    internal void BeginHold(bool learn = true)
     {
         _crossingCount = _nextLevel = _sampleCount = _readingCount = 0;
         _finished = false;
+        _canLearn = learn;
         _previous = null;
     }
 
@@ -53,7 +54,7 @@ internal sealed class NbaMeterSweepTiming(double target)
 
     internal NbaMeterSweep[] Snapshot() => _completed.ToArray();
 
-    internal NbaMeterForecast.Estimate? Observe(NbaMeterDetector.Measurement? reading, bool ambiguous, double time, bool trackingAcquired)
+    internal NbaMeterForecast.Estimate? Observe(NbaMeterDetector.Measurement? reading, bool ambiguous, double time, bool trackingAcquired, bool canRestartRise = false)
     {
         if (ambiguous)
         {
@@ -62,6 +63,12 @@ internal sealed class NbaMeterSweepTiming(double target)
             return null;
         }
         if (_finished || reading is not { MeasuredFill: true } meter) return null;
+        // A settling rail can briefly report a second, lower fill edge at the bottom.
+        // Refit from the new edge only while identity is continuous and no stroke is scheduled.
+        if (canRestartRise && _previous is { } prior && _highProgress < target * .5 && _highProgress - meter.Progress > .07
+            && time > _lastTime && time - _lastTime <= 70 && meter.Height / prior.Height is >= .8 and <= 1.25
+            && Math.Abs(meter.Bounds.Left - prior.Bounds.Left) <= .08 && Math.Abs(meter.Bounds.Top - prior.Bounds.Top) <= .08)
+            BeginHold(learn: false);
         var standard = NbaMeterSweep.StandardLevels;
         _readingCount++;
         if (_previous is not { } previous)
@@ -107,7 +114,7 @@ internal sealed class NbaMeterSweepTiming(double target)
         _lastTime = time;
         if (meter.Progress >= target)
         {
-            if (_readingCount >= 5 && _crossingCount >= 4 && _crossings[_crossingCount - 1] - _crossings[0] >= 75)
+            if (_canLearn && _readingCount >= 5 && _crossingCount >= 4 && _crossings[_crossingCount - 1] - _crossings[0] >= 75)
             {
                 var times = _crossings[.._crossingCount];
                 for (int i = 0; i < times.Length; i++) times[i] -= _crossings[0];

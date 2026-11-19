@@ -41,6 +41,15 @@ internal static class MeterContinuityChecks
         using var missingOrigin = new Fixture();
         missingOrigin.HostStart = 0;
         Check(missingOrigin.At(75, .2).InvalidateAttempt, "Armed assistance silently substituted video time for missing physical hold timing.");
+        using var tail = new Fixture(holdMs: 70);
+        Check(!tail.At(73, .499, measured: true).Acquired, "A previous shot's half-full tail acquired a new press.");
+        for (int t = 90; t <= 400; t += 25) tail.At(t, null);
+        Check(tail.At(410, .16, measured: true).Acquired, "Rejecting a prior tail disabled the new meter.");
+        using var reversal = new Fixture();
+        for (int t = 0; t <= 60; t += 20) reversal.At(t, .2 + .005 * t, height: 640, measured: true);
+        var pulled = reversal.At(78, .47, height: 640, measured: true);
+        Check(pulled.WithdrawPendingForecast && !pulled.InvalidateAttempt && pulled.TimeToTargetMs == null,
+            "A reversed measured edge left the old deadline active or cancelled the entire press.");
     }
 
     private static void ShortAndExpiredIdentity()

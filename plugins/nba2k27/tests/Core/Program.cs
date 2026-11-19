@@ -6,6 +6,15 @@ if (args is ["--meter-fixtures", var oldMeterSession, var armedMeterDiagnostic, 
 { MeterDetectorFixtureChecks.Run(oldMeterSession, armedMeterDiagnostic, heldMeterReplay); return; }
 if (args is ["--meter-diagnostic", var diagnosticDirectory, var diagnosticOutput])
 { MeterDiagnosticChecks.Inspect(diagnosticDirectory, diagnosticOutput); return; }
+if (args is ["--meter-diagnostic", var directoryWithRefs, var outputWithRefs, var savedReferences])
+{ MeterDiagnosticChecks.Inspect(directoryWithRefs, outputWithRefs, savedReferences); return; }
+
+if (args is ["--meter-controller-replay", var fullDiagnostic, var controllerReport])
+{ MeterDiagnosticChecks.Inspect(fullDiagnostic, controllerReport, useLoggedSignals: true); return; }
+if (args is ["--meter-observation-replay", var archive, var landmarks, var pixelReport, var observationReport])
+{ MeterDiagnosticChecks.Inspect(archive, observationReport, landmarks, pixelReport: pixelReport); return; }
+if (args is ["--meter-prefixes", var observed, var curves, var leadReport])
+{ MeterPrefixChecks.Run(observed, curves, leadReport); return; }
 
 if (args is ["--meter-calibration"]) { MeterChecks.Calibration(); return; }
 

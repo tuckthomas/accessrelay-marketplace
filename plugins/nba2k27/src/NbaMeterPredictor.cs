@@ -15,7 +15,7 @@ internal sealed class NbaMeterPredictor(Nba2K27ShotProfile profile, NbaMeterSett
     private int _count, _width, _height;
     private long _holdStart, _hostHoldStart, _lastCapture, _lastDetection, _hostShotToken, _generation = -1;
     private double _bestUncertainty = double.PositiveInfinity, _bestConfidence;
-    private string? _attemptFailure;
+    private string? _attemptFailure, _timingLimit;
     private const double RailOnlyGraceMs = 40;
     private const double IdentityGraceMs = 70;
     private const double MinimumVelocityWindowMs = 58;
@@ -77,15 +77,22 @@ internal sealed class NbaMeterPredictor(Nba2K27ShotProfile profile, NbaMeterSett
         if (heldMs > settings.MaximumShotDurationMs) return Fail("Shot expired. Release the shot trigger before the next shot.");
         bool anchored = context.StrokeAnchorTimestamp > 0 && captureTicks >= context.StrokeAnchorTimestamp;
         var measured = _detector.Detect(bgra, width, height, stride);
-        var sweep = _sweepTiming.Observe(measured, _detector.Ambiguous, captureTicks * 1000d / Stopwatch.Frequency,
-            trackingAcquired: _acquired || _forecasted);
         if (_attemptFailure is { } failure) return Observation(failure, invalidate: true);
-        if (actionEnded) return Observation("Controller action ended. Check controller status and return to neutral.");
+        double sampleMs = captureTicks * 1000d / Stopwatch.Frequency;
+        if (actionEnded)
+        {
+            // A valid, already-identified sweep can finish teaching after local output ends.
+            if (_acquired) _sweepTiming.Observe(measured, _detector.Ambiguous, sampleMs, true);
+            return Observation("Controller action ended. Check controller status and return to neutral.");
+        }
         if (!_acquired && heldMs > configuration.AcquisitionWindowMs + settings.EstimatedVideoDelayMs)
             return Fail("No new meter appeared inside the input acquisition window. Return to neutral.");
         if (_detector.Ambiguous)
+        {
+            _sweepTiming.Observe(null, true, sampleMs, _acquired || _forecasted);
             return _acquired || _forecasted ? Fail("Multiple meters made tracking ambiguous. Return to neutral.")
                 : Observation("Searching for one unambiguous meter.");
+        }
         if (_last is { MeasuredFill:true } && measured is { MeasuredFill:false }) measured=null;
         if (measured is not { } meter)
         {
@@ -112,8 +119,13 @@ internal sealed class NbaMeterPredictor(Nba2K27ShotProfile profile, NbaMeterSett
                 return Fail("Meter identity expired before reacquisition. Return to neutral.", meter);
             ClearWeakCandidate();
         }
-        if (!_acquired && (meter.Progress >= .70 || (meter.Progress > .5 && (!_sawPreShotClear || heldMs < 250))))
-            return Observation("Waiting for a newly appearing meter, rather than a prior shot's result.");
+        bool PriorFill() => meter.Progress >= .70 || (meter.Progress > .5 && !_sawPreShotClear)
+            || (heldMs < 250 && meter.Progress + 1 / Math.Max(1, meter.Height * .9) >= Math.Min(.5, configuration.TargetProgress / 2));
+        if (!_acquired && PriorFill())
+        {
+            _detector.Reset();
+            return Observation("Waiting for a new meter after the previous shot.");
+        }
         if (_last is null && meter.Progress <= .03)
         {
             _sawPreShotClear = true;
@@ -125,6 +137,18 @@ internal sealed class NbaMeterPredictor(Nba2K27ShotProfile profile, NbaMeterSett
             double scale = meter.Height / previous.Height;
             bool badScale = scale is < .7 or > 1.4;
             bool backward = meter.Progress < previous.Progress - .12;
+            // A resolved downward edge contradicts the rising sweep used to schedule this stroke.
+            // Withdraw it while the paddle still owns down. Any replacement must qualify anew.
+            if (_forecasted && context.StrokeAnchorTimestamp == 0 && previous.MeasuredFill && meter.MeasuredFill
+                && !posJump && !badScale && !backward
+                && previous.Progress - meter.Progress > Math.Max(.015, 2 / (meter.Height * .9)))
+            {
+                _forecasted = false; _count = 0;
+                _sweepTiming.BeginHold(learn: false);
+                _last = meter; _lastDetection = captureTicks;
+                _timingLimit = "The measured fill reversed before stroke start. The pending forecast was withdrawn.";
+                return Observation(_timingLimit, meter) with { WithdrawPendingForecast = true };
+            }
             if (posJump || badScale || backward)
             {
                 if (CanRecoverWeakCandidate(previous) && (meter.Score >= .80 || backward))
@@ -132,7 +156,7 @@ internal sealed class NbaMeterPredictor(Nba2K27ShotProfile profile, NbaMeterSett
                     ClearWeakCandidate();
                     if (backward && meter.Score < .80)
                         return Observation("Searching the gameplay viewport for one unambiguous meter.");
-                    if (meter.Progress >= .70 || (meter.Progress > .5 && (!_sawPreShotClear || heldMs < 250)))
+                    if (PriorFill())
                         return Observation("Waiting for a newly appearing meter, rather than a prior shot's result.");
                 }
                 else if (posJump)
@@ -144,6 +168,7 @@ internal sealed class NbaMeterPredictor(Nba2K27ShotProfile profile, NbaMeterSett
             }
         }
         _acquired = true;
+        var sweep = _sweepTiming.Observe(meter, false, sampleMs, true, canRestartRise: !_forecasted && context.StrokeAnchorTimestamp == 0);
         if (Math.Abs(meter.Bow) > 1e-6) _curvedMeter = true;
         _last = meter; _lastDetection = captureTicks;
         if (meter.Progress <= .03) return Observation("Meter acquired; waiting for the interior fill to advance.", meter);
@@ -169,7 +194,7 @@ internal sealed class NbaMeterPredictor(Nba2K27ShotProfile profile, NbaMeterSett
         if (tau < 0)
         {
             if (_forecasted) return Fail("The forecast target passed without a validated completion. Return to neutral.", meter, velocity);
-            if (double.IsFinite(_bestUncertainty)) return UnforecastedCompletion(meter, velocity);
+            if (meter.Progress >= configuration.TargetProgress && double.IsFinite(_bestUncertainty)) return UnforecastedCompletion(meter, velocity);
             return Observation("The observed target has passed. Return to neutral.", meter, velocity, confidence, uncertainty, invalidate: _forecasted);
         }
         double effectiveMaxUncertainty = tau > 175 ? Math.Min(settings.MaximumUncertaintyMs, 8.5) : settings.MaximumUncertaintyMs;
@@ -192,14 +217,18 @@ internal sealed class NbaMeterPredictor(Nba2K27ShotProfile profile, NbaMeterSett
         // An accelerating fit can briefly put the target in the past while the fill
         // is still near the bottom. Sending that estimate would cancel the physical
         // hold permanently. Allow the next real frame to establish a usable estimate.
-        if (meter.MeasuredFill && sweep is null && Action.Kind == VisionActionKind.RightStickStroke
-            && context.StrokeAnchorTimestamp == 0 && meter.Progress < configuration.TargetProgress * .8)
+        if (!_forecasted && meter.MeasuredFill && Action.Kind == VisionActionKind.RightStickStroke
+            && context.StrokeAnchorTimestamp == 0)
         {
-            double minimumLead = settings.EstimatedVideoDelayMs + settings.EstimatedInputDelayMs - settings.CorrectionMs
-                + Action.AnchorTimeFraction * configuration.EffectiveStrokeMs(settings) - settings.MaximumLatenessMs;
+            double minimumLead = context.MinimumStrokeLeadMs ?? (settings.EstimatedVideoDelayMs + settings.EstimatedInputDelayMs - settings.CorrectionMs
+                + Action.AnchorTimeFraction * configuration.EffectiveStrokeMs(settings) - settings.MaximumLatenessMs);
             if (tau < minimumLead)
-                return Observation("The meter is still filling. Waiting for a prediction with time for the full upstroke.",
+            {
+                if (meter.Progress >= configuration.TargetProgress * .8)
+                    _timingLimit ??= $"The first qualified forecast left {tau:F1} ms. A complete stroke required at least {minimumLead:F1} ms.";
+                return Observation(_timingLimit ?? "The meter is still filling. Waiting for a prediction with time for the full upstroke.",
                     meter, velocity, confidence, uncertainty);
+            }
         }
         _forecasted = true;
         return Observation("Meter fill forecast ready.", meter, velocity, confidence, uncertainty, tau);
@@ -209,24 +238,26 @@ internal sealed class NbaMeterPredictor(Nba2K27ShotProfile profile, NbaMeterSett
 
         VisionSignalObservation Fail(string message, NbaMeterDetector.Measurement? current = null, double velocity = 0)
         {
-            _attemptFailure = message; _forecasted = false; _count = 0;
-            return Observation(message, current, velocity, invalidate: true);
+            _attemptFailure = !_forecasted && _timingLimit is { } limit ? limit + " " + message : message;
+            _forecasted = false; _count = 0;
+            return Observation(_attemptFailure, current, velocity, invalidate: true);
         }
 
         VisionSignalObservation UnforecastedCompletion(NbaMeterDetector.Measurement current, double currentVelocity)
-            => Observation($"Meter reached its cap without a usable forecast. Best observed uncertainty: {_bestUncertainty:F1} ms; highest geometry score: {_bestConfidence:F2}.",
+            => Observation(_timingLimit ??= $"Meter reached its cap without a usable forecast. Best observed uncertainty: {_bestUncertainty:F1} ms (limit {settings.MaximumUncertaintyMs:F1} ms); highest geometry score: {_bestConfidence:F2}.",
                 current, currentVelocity, _bestConfidence, _bestUncertainty);
 
         VisionSignalObservation Observation(string message, NbaMeterDetector.Measurement? found = null, double velocity = 0,
             double? confidence = null, double uncertainty = 0, double? tau = null, bool invalidate = false)
             => new(sequence, captureTicks, found.HasValue, found?.Bounds, found?.Progress ?? 0, configuration.TargetProgress,
                 velocity, tau, confidence ?? found?.Score ?? 0, double.IsFinite(uncertainty) ? uncertainty : 1000, message, _count,
-                Stopwatch.GetElapsedTime(began).TotalMilliseconds, width, height, invalidate);
+                Stopwatch.GetElapsedTime(began).TotalMilliseconds, width, height, invalidate) { ForecastLimit = _timingLimit };
     }
     private bool CanRecoverWeakCandidate(NbaMeterDetector.Measurement candidate)
         => !_forecasted && _count <= 2 && candidate.Score < .78;
     private void ClearWeakCandidate()
     {
+        _sweepTiming.BeginHold();
         _count = 0; _acquired = false; _curvedMeter = false; _last = null; _lastDetection = 0;
         _bestConfidence = 0; _bestUncertainty = double.PositiveInfinity;
         _detector.Reset();
@@ -235,7 +266,7 @@ internal sealed class NbaMeterPredictor(Nba2K27ShotProfile profile, NbaMeterSett
     {
         _sweepTiming.BeginHold();
         _count = 0; _forecasted = _acquired = _curvedMeter = _sawPreShotClear = false; _last = null; _lastCapture = _lastDetection = 0;
-        _attemptFailure = null; _bestConfidence = 0; _hostShotToken = 0;
+        _attemptFailure = _timingLimit = null; _bestConfidence = 0; _hostShotToken = 0;
         _bestUncertainty = double.PositiveInfinity;
         _detector.Reset();
     }

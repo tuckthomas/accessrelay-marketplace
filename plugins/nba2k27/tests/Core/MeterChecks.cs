@@ -82,10 +82,10 @@ internal static class MeterChecks
                 new(physicalHold, ticks, outputBefore.SessionGeneration, outputBefore.ShotToken, outputBefore.ShotStartedTimestamp, true)
                 { HoldStartedTimestamp = arbiter.HoldStartedTimestamp, StrokeAnchorTimestamp = arbiter.StrokeAnchorTimestamp });
             bool submitted = false;
-            if (forecast.TimeToTargetMs.HasValue || forecast.InvalidateAttempt || forecast.ContinueCommittedAction)
+            if (forecast.HasDecision)
                 submitted = arbiter.Submit(new(outputBefore.SessionGeneration, outputBefore.ShotToken, index, ticks, ticks,
                     forecast.TimeToTargetMs ?? 0, forecast.Confidence, forecast.UncertaintyMs, forecast.Acquired && !forecast.InvalidateAttempt)
-                    { ContinueCommittedAction = forecast.ContinueCommittedAction && !forecast.InvalidateAttempt }, ticks);
+                    { WithdrawPendingForecast = forecast.WithdrawPendingForecast, ContinueCommittedAction = forecast.ContinueCommittedAction && !forecast.InvalidateAttempt }, ticks);
             rows.Add(new { index, found, ms, signal, simulatedContinuedHold = hypothetical,
                 simulatedScheduledHold = new { forecast, submitted, status = arbiter.Status, rightY = arbiter.Output.RightY, receipt = arbiter.LastAction } }); index++;
         }

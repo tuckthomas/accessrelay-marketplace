@@ -87,10 +87,10 @@ internal static class MeterUpstrokeChecks
                     new(default(ControllerState), capture, before.SessionGeneration, before.ShotToken, origin, true)
                     { HoldStartedTimestamp = origin, HeldPaddles = PaddleButtons.LargeRight, StrokeAnchorTimestamp = arbiter.StrokeAnchorTimestamp });
                 if (!predictor.CanArm) throw new Exception("Saved practice results did not enable assistance.");
-                if (before.ShotToken == 0 || !(signal.TimeToTargetMs.HasValue || signal.InvalidateAttempt || signal.ContinueCommittedAction)) continue;
+                if (before.ShotToken == 0 || !(signal.HasDecision)) continue;
                 bool accepted = arbiter.Submit(new(before.SessionGeneration, before.ShotToken, sequence, capture, decision,
                     signal.TimeToTargetMs ?? 0, signal.Confidence, signal.UncertaintyMs, signal.Acquired && !signal.InvalidateAttempt)
-                    { ContinueCommittedAction = signal.ContinueCommittedAction, TrackingFailure = signal.Message }, decision);
+                    { WithdrawPendingForecast = signal.WithdrawPendingForecast, ContinueCommittedAction = signal.ContinueCommittedAction, TrackingFailure = signal.Message }, decision);
                 if (accepted && signal.TimeToTargetMs.HasValue) lead ??= signal.TimeToTargetMs;
             }
             if (shot.Truncated)
