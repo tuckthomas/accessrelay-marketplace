@@ -25,18 +25,19 @@ internal sealed class NbaMeterSweepTiming(double target)
     private readonly double[] _crossings = new double[NbaMeterSweep.StandardLevels.Length];
     private readonly (double Time, double Progress)[] _samples = new (double, double)[12];
     private int _crossingCount, _nextLevel, _sampleCount, _readingCount;
-    private bool _finished, _canLearn = true;
+    private bool _finished, _canLearn = true, _useOpeningCrossing;
     private double _highTime, _highProgress, _lastTime;
     private NbaMeterDetector.Measurement? _previous;
     internal int CompletedSweeps => _completed.Count;
     internal bool HasNewSweeps { get; private set; }
     internal bool Finished => _finished;
 
-    internal void BeginHold(bool learn = true)
+    internal void BeginHold(bool learn = true, bool useOpeningCrossing = false)
     {
         _crossingCount = _nextLevel = _sampleCount = _readingCount = 0;
         _finished = false;
         _canLearn = learn;
+        _useOpeningCrossing = useOpeningCrossing;
         _previous = null;
     }
 
@@ -76,6 +77,7 @@ internal sealed class NbaMeterSweepTiming(double target)
         {
             // Record where the fill actually appeared. Earlier crossings cannot be recovered.
             double firstLevel = meter.Progress / target;
+            if (firstLevel >= standard[0]) _useOpeningCrossing = false;
             if (firstLevel >= standard[0] && firstLevel < 1)
             {
                 _levels[0] = firstLevel;
@@ -103,6 +105,13 @@ internal sealed class NbaMeterSweepTiming(double target)
                     double level = standard[_nextLevel++];
                     double fraction = (level * target - _highProgress) / (meter.Progress - _highProgress);
                     double crossing = _highTime + fraction * (time - _highTime);
+                    if (_useOpeningCrossing && _crossingCount == 0)
+                    {
+                        double pixel = 1 / (meter.Height * .9);
+                        _useOpeningCrossing = previous.Score >= .65 && meter.Score >= .65 &&
+                            level == standard[0] && level * target - _highProgress >= pixel
+                            && meter.Progress - level * target >= pixel;
+                    }
                     if (_crossingCount > 0 && crossing - _crossings[_crossingCount - 1] < 2) continue;
                     _levels[_crossingCount] = level;
                     _crossings[_crossingCount++] = crossing;
@@ -213,8 +222,8 @@ internal sealed class NbaMeterSweepTiming(double target)
     private NbaMeterForecast.Estimate? Match(NbaMeterDetector.Measurement meter, double time)
     {
         Span<(double Deadline, double Error, double Velocity)> candidates = stackalloc (double, double, double)[Capacity];
-        Span<double> offsets = stackalloc double[_sampleCount];
-        Span<double> scratch = stackalloc double[_sampleCount];
+        Span<double> offsets = stackalloc double[_sampleCount + 1];
+        Span<double> scratch = stackalloc double[_sampleCount + 1];
         int count = 0;
         foreach (var sweep in _completed)
         {
@@ -223,6 +232,15 @@ internal sealed class NbaMeterSweepTiming(double target)
             if (meter.Progress < sweep.Levels[0] * target) continue;
             double velocity = 0, firstTime = 0, firstProgress = 0;
             int usable = 0;
+            // After an outline handoff the first measured edge can be below the reference.
+            // Its crossing with the next edge supplies the start time of the reference curve.
+            if (_useOpeningCrossing && _sampleCount == 4 && _crossingCount > 0 &&
+                _levels[0] == sweep.Levels[0] && _crossings[0] < _samples[0].Time)
+            {
+                firstTime = _crossings[0];
+                firstProgress = _levels[0] * target;
+                offsets[usable++] = firstTime;
+            }
             for (int i = 0; i < _sampleCount; i++)
             {
                 var sample = _samples[i];

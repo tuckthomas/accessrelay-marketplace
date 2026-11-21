@@ -41,7 +41,8 @@ internal sealed class RecordedMeterGeometry(JsonElement rows, bool preferImages 
         {
             if (live?.Message.Contains("rails tracked", StringComparison.OrdinalIgnoreCase) == true) HasRailIdentity = true;
             if (live?.Message.Contains("ambiguous", StringComparison.OrdinalIgnoreCase) == true && !live.Message.Contains("unambiguous")) Ambiguous = true;
-            HasObservation |= Ambiguous || HasRailIdentity;
+            // A logged empty search is still a detector frame when the image writer skipped its pixels.
+            HasObservation |= Ambiguous || HasRailIdentity || live?.Message == "Searching the gameplay viewport for one unambiguous meter.";
             return;
         }
         HasObservation = true;

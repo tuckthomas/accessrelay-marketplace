@@ -160,7 +160,19 @@ internal sealed class NbaMeterPredictor(Nba2K27ShotProfile profile, NbaMeterSett
                 _timingLimit = "The measured fill reversed before stroke start. The pending forecast was withdrawn.";
                 return Observation(_timingLimit, meter) with { WithdrawPendingForecast = true };
             }
-            if (posJump || badScale || backward)
+            if (!previous.MeasuredFill && meter.MeasuredFill && !_forecasted && context.StrokeAnchorTimestamp == 0
+                && !posJump && !badScale)
+            {
+                // The outline and the measured strip use different rail lengths. Keep tracking the
+                // same meter, but fit its rise from the first directly measured edge.
+                _sweepTiming.BeginHold(useOpeningCrossing: true);
+                _count = 0;
+                _curvedMeter = false;
+                _bestConfidence = 0;
+                _bestUncertainty = double.PositiveInfinity;
+                _timingLimit = null;
+            }
+            else if (posJump || badScale || backward)
             {
                 if (CanRecoverWeakCandidate(previous) && (meter.Score >= .80 || backward))
                 {

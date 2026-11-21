@@ -6,6 +6,7 @@ internal static class MeterForecastChecks
     {
         CheckObservedSweeps();
         CheckEarlyPace();
+        CheckOpeningCrossing();
         MeterLearningChecks.Run();
         MeterUpstrokeChecks.Run();
         int qualified = 0, conservative = 0;
@@ -36,6 +37,38 @@ internal static class MeterForecastChecks
         if (Math.Abs(near.Tau - 60) > .1 || far.Uncertainty <= near.Uncertainty)
             throw new Exception("Long-horizon model disagreement did not raise uncertainty.");
         Console.WriteLine($"SUCCESS Competing meter curves/horizons: {qualified} qualified forecasts, {conservative} conservative forecasts; long-horizon uncertainty.");
+    }
+
+    private static void CheckOpeningCrossing()
+    {
+        // Saved frames can straddle the first calibration mark when the outline yields to the fill.
+        var history = new NbaMeterSweepTiming(.75);
+        history.Restore([
+            NbaMeterSweep.FromLegacy([0, 54.64, 102.79, 167.34, 219.98, 277.76]),
+            NbaMeterSweep.FromLegacy([0, 45.78, 104.15, 168.20, 215.81, 274.85]),
+            NbaMeterSweep.FromLegacy([0, 44.12, 97.08, 158.76, 210.73, 267.00]),
+            NbaMeterSweep.FromLegacy([0, 52.46, 109.58, 169.90, 218.52, 280.76]),
+            NbaMeterSweep.FromLegacy([0, 54.27, 104.04, 166.27, 219.44, 279.24])
+        ]);
+
+        NbaMeterForecast.Estimate? Replay(double firstFill)
+        {
+            history.BeginHold(useOpeningCrossing: true);
+            var samples = new (int Time, double Fill)[] { (421, firstFill), (440, .168), (472, .237), (519, .335), (554, .408) };
+            NbaMeterForecast.Estimate? forecast = null;
+            foreach (var sample in samples)
+            {
+                var meter = new NbaMeterDetector.Measurement(new(.4, .4, .04, .15), sample.Fill, .94, 172, 800, 600) { MeasuredFill = true };
+                forecast = history.Observe(meter, false, sample.Time, true);
+            }
+            return forecast;
+        }
+
+        var qualified = Replay(.119);
+        if (qualified is not { Tau: > 139 and < 155, Uncertainty: <= 12 })
+            throw new Exception($"Two edges bracketing the calibration mark did not leave time for a complete stroke: {qualified}.");
+        if (Replay(.149) is not null)
+            throw new Exception("A subpixel difference counted as independent evidence for the crossing.");
     }
 
     private static void CheckEarlyPace()

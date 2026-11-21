@@ -15,6 +15,7 @@ internal static class MeterContinuityChecks
         ForecastTimeIsNotShifted();
         CurvedForecastRequiresEnoughEvidence();
         WeakEarlyFalseLockRecoversCleanly();
+        FirstMeasuredFillStartsItsOwnRise();
         MovingMeterTracksAcrossHorizontalShift();
         DelayedOffDribbleMeterAcquiresAfterClearSearch();
         FrameCadenceHonorsConfiguredLimit();
@@ -288,6 +289,39 @@ internal static class MeterContinuityChecks
         Check(jumped.Acquired && !jumped.InvalidateAttempt, $"Direct jump to high-confidence meter failed: {jumped.Message}");
     }
 
+    private static void FirstMeasuredFillStartsItsOwnRise()
+    {
+        using var shot = new Fixture(targetProgress: .75);
+        // The two outline estimates and first directly measured fill from session shot 30.
+        shot.At(389, .244, height: 191);
+        shot.At(406, .267, height: 191);
+        var first = shot.At(421, .119, height: 169, measured: true);
+        Check(first.Acquired && !first.InvalidateAttempt && first.Samples == 1 && first.TimeToTargetMs is null,
+            $"The first directly measured fill inherited the outline estimates: {first.Message}");
+        for (int ms = 441; ms < 581; ms += 20)
+            shot.At(ms, .119 + (ms - 421) * .002, height: 172, measured: true);
+        var forecast = shot.At(581, .439, height: 172, measured: true);
+        Check(forecast.TimeToTargetMs.HasValue && !forecast.InvalidateAttempt,
+            $"The measured rise could not schedule a stroke after the handoff: {forecast.Message}");
+        Check(shot.At(598, .290, height: 172, measured: true).InvalidateAttempt,
+            "A subsequent reversal between two direct measurements was ignored.");
+
+        using var forward = new Fixture();
+        forward.At(389, .11); forward.At(406, .15);
+        Check(forward.At(421, .2, measured: true).Samples == 1,
+            "A forward method change mixed outline and measured fill speeds.");
+
+        using var different = new Fixture();
+        different.At(389, .244); different.At(406, .267);
+        Check(different.At(421, .119, x: 60, measured: true).InvalidateAttempt,
+            "A measured fill at a different position inherited the old meter.");
+
+        using var scheduled = new Fixture();
+        scheduled.Ready();
+        Check(scheduled.At(80, .1, measured: true).InvalidateAttempt,
+            "A conflicting first measured fill left an existing forecast active.");
+    }
+
     private static void MovingMeterTracksAcrossHorizontalShift()
     {
         const int w = 1280, h = 720, stride = w * 4;
@@ -408,10 +442,10 @@ internal static class MeterContinuityChecks
         private long _sequence;
         internal long HostStart = Ticks(0), Anchor;
         internal int Time;
-        internal Fixture(double holdMs = 0, double minimumConfidence = .65)
+        internal Fixture(double holdMs = 0, double minimumConfidence = .65, double targetProgress = 1)
         {
             var profile = new Nba2K27ShotProfile(Guid.NewGuid(), "Fixture", 83, 91, "Base", "Upper 1", "Upper 2", true, "Push");
-            _predictor = new(profile, new() { Trigger = "physicalStick", CalibrationTrial = true, HoldMs = holdMs },
+            _predictor = new(profile, new() { Trigger = "physicalStick", CalibrationTrial = true, HoldMs = holdMs, TargetProgress = targetProgress },
                 VisionSettings.Default with { MinimumConfidence = minimumConfidence, MaximumUncertaintyMs = 12 }, _detector);
         }
         internal static long Ticks(int ms) => Stopwatch.Frequency * 2 + (long)(ms * Stopwatch.Frequency / 1000d);
