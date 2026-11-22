@@ -15,6 +15,33 @@ function fixture(overrides: any = {}) {
 }
 
 describe('meter calibration workflow', () => {
+  it('graphs the applied auto-green stroke offline and moves the release point when tuning changes', () => {
+    const state = fixture(), command = vi.fn();
+    const stroke = { durationMs: 54, fullUpHoldMs: 48, anchorFraction: .85, anchorTimeFraction: .85, smooth: false, automaticDown: true };
+    Object.assign(state.assistance, { stickTrajectory: stroke });
+    Object.assign(state.settings, { correctionMs: 2, feedbackTimingCorrections: { 'current-setup': -4 } });
+    Object.assign(state.settings.pluginAssistance, { confirmed: true, calibrationTrial: false });
+    const view = render(<Workspace mode="live" state={state} status={{}} command={command} />);
+    const graph = () => screen.getByRole('img', { name: /upstroke takes 54 ms/ });
+    const curve = () => graph().querySelector('.nba-stick-timed path')!.getAttribute('d');
+    expect(graph().getAttribute('aria-label')).toContain('release point is −4 ms');
+    expect(graph().getAttribute('aria-label')).toContain('full up for 48 ms and returns to center');
+    const savedCurve = curve();
+    const status = { session: { running: true, modelReady: true }, ocrEffectiveTimingMs: -8 };
+    view.rerender(<Workspace mode="live" state={state} status={status} command={command} />);
+    expect(graph().getAttribute('aria-label')).toContain('release point is −8 ms');
+    expect(curve()).not.toBe(savedCurve);
+    const trial = { ...state, settings: { ...state.settings, pluginAssistance: { ...state.settings.pluginAssistance, calibrationTrial: true } },
+      assistance: { ...state.assistance, stickTrajectory: { ...stroke, smooth: true, anchorTimeFraction: .7556, automaticDown: false } } };
+    view.rerender(<Workspace mode="live" state={trial} status={{}} command={command} />);
+    expect(graph().getAttribute('aria-label')).toContain('physical stick');
+    expect(graph().getAttribute('aria-label')).toContain('release point is 2 ms');
+    expect(curve()).toContain('C ');
+    expect(graph().querySelector('.nba-stick-lead')).toBeNull();
+    view.rerender(<Workspace mode="live" state={{ ...trial, assistance: { ...trial.assistance, stickTrajectory: null } }} status={{}} command={command} />);
+    expect(screen.queryByRole('heading', { name: 'Auto-green stick trajectory' })).toBeNull();
+    expect(command).not.toHaveBeenCalled();
+  });
   it.each([['largeRight', 'Tap once'], ['rightDown', 'Push once'], ['a', 'Tap once']])('saves and restores activation for %s', async (trigger, label) => {
     const state = fixture(), command = vi.fn().mockResolvedValue(null);
     Object.assign(state.settings.pluginAssistance, { trigger, confirmed: true });

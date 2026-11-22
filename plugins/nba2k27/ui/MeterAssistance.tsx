@@ -1,6 +1,7 @@
 import { React, useEffect, useRef, useState, Button, Card, Field, Input, Notice, Select, SelectOption,
   ProfilePicker, GameplayPreview, Icon, Checkbox, useUnsavedChanges, type VisionWorkspaceProps } from './host.js';
 import { adjustMeterCalibration, successfulMeterResult } from './MeterCalibration.js';
+import { StickTrajectoryGraph } from './StickTrajectory.js';
 
 export const meterDefaults = { version: 1, enabled: true, inputMode: 'rhythm', trigger: 'largeRight', activation: 'hold', style: 'curved', viewport: { left: 0, top: 0, width: 1, height: 1 },
   targetRed: 80, targetGreen: 210, targetBlue: 95, colorToleranceDegrees: 30, holdMs: 70, acquisitionWindowMs: 800, strokeDurationMs: 56, anchorFraction: .85,
@@ -91,6 +92,10 @@ export function MeterAssistance({ state = {}, status, command, captureWindow, ed
   }, [saved, dirty, profile?.id]);
   const locked = !!session.running || !!s.stopping || (!!s.diagnosticRecording && !s.diagnosticRecording.isFinalized), working = !!busy || !!s.busy;
   const output = s.output ?? {}, calibration = state.assistance ?? {}, receipt = s.lastAction;
+  const savedTrial = saved.pluginAssistance?.calibrationTrial ?? !saved.pluginAssistance?.confirmed;
+  const savedCorrection = (savedTrial ? undefined : saved.feedbackTimingCorrections?.[calibration.key]) ?? saved.correctionMs ?? 0;
+  const strokeCorrection = session.running && session.modelReady && Number.isFinite(s.ocrEffectiveTimingMs)
+    ? s.ocrEffectiveTimingMs : savedCorrection;
   const diagnostic = s.diagnosticRecording, recordingDiagnostics = !!diagnostic?.isRecording;
   const savingDiagnostics = !!diagnostic && !diagnostic.isRecording && !diagnostic.isFinalized;
   const switchingBlocked = !!s.stopping || recordingDiagnostics || savingDiagnostics || !!s.training?.isRecording || working || dirty;
@@ -346,6 +351,8 @@ export function MeterAssistance({ state = {}, status, command, captureWindow, ed
       <div className="meter-capture"><GameplayPreview status={s} window={captureWindow} onError={setError} actions={locked
         ? <Button active={!!session.running} disabled={!!s.stopping} onClick={() => void stopPreview()}>Stop preview</Button>
         : <Button active={false} disabled={working || !profile?.usesShotMeter || !source} busy={busy === 'start'} onClick={() => void preview()}>Start preview</Button>} />
+        {profile?.usesShotMeter && config.inputMode === 'rhythm' && calibration.stickTrajectory &&
+          <StickTrajectoryGraph stroke={calibration.stickTrajectory} correctionMs={strokeCorrection} />}
         <details className="meter-diagnostics"><summary>Detection details</summary><p role="status">{signal.message || 'Detection runs when you hold the shooting input.'}</p>
           <div className="meter-readings">{[['Fill', `${fmt(signal.progress * 100)}%`], ['Predicted target', `${fmt(signal.timeToTargetMs)} ms`],
             ['Fill velocity', signal.continueCommittedAction ? '—' : `${fmt(signal.velocityPerMs * 1000 * 100)}% / s`], ['Samples', signal.samples ?? 0],
@@ -492,6 +499,19 @@ const styles = `
 .meter-diagnostics,.meter-advanced{border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:16px}.meter-diagnostics summary,.meter-advanced>summary{cursor:pointer;font-weight:600;font-size:14px}
 .meter-advanced[open]>summary{margin-bottom:16px}.meter-advanced>.card{border:0;padding:8px 0 0}.meter-readings{display:grid;grid-template-columns:repeat(auto-fit,minmax(115px,1fr));gap:12px;margin-top:16px}
 .meter-readings>div{display:grid;gap:6px}.meter-readings span{font-size:14px;color:var(--muted)}
+.nba-stick-graph{margin:0;font-size:14px;font-variant-numeric:tabular-nums}
+.nba-stick-key{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px 16px;color:var(--ink)}
+.nba-stick-key span:last-child{display:inline-flex;align-items:center;gap:7px}.nba-stick-key i,.nba-stick-anchor{width:9px;height:9px;border-radius:50%;background:var(--roi-feedback);box-shadow:0 0 0 2px var(--surface)}
+.nba-stick-chart{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:12px;margin:22px 16px 0 0}
+.nba-stick-levels,.nba-stick-grid{position:relative;height:112px}.nba-stick-levels{width:8ch;color:var(--muted)}
+.nba-stick-levels span{position:absolute;right:0;transform:translateY(-50%);white-space:nowrap}.nba-stick-levels span:nth-child(2){top:50%}.nba-stick-levels span:last-child{top:100%}
+.nba-stick-grid{display:flex;box-shadow:inset 0 1px var(--line),inset 0 -1px var(--line)}.nba-stick-grid::before{content:"";position:absolute;top:50%;width:100%;border-top:1px dashed var(--line)}
+.nba-stick-lead,.nba-stick-timed{position:relative}.nba-stick-lead{width:16%;max-width:74px}.nba-stick-timed{flex:1;min-width:0}
+.nba-stick-graph svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.nba-stick-curve,.nba-stick-break{fill:none;stroke:var(--accent);stroke-width:3;stroke-linejoin:round;vector-effect:non-scaling-stroke}.nba-stick-break{stroke:var(--muted);stroke-width:1.5}
+.nba-stick-tick{position:absolute;height:100%;border-left:1px dotted var(--line)}.nba-stick-tick span,.nba-stick-onset{position:absolute;top:100%;margin-top:7px;color:var(--muted)}
+.nba-stick-tick span{transform:translateX(-50%)}.nba-stick-anchor{position:absolute;transform:translate(-50%,-50%)}
+.nba-stick-axis{text-align:center;margin:32px 0 10px;color:var(--ink)}.nba-stick-graph figcaption{margin:0}
 .meter-ocr-box{display:grid;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}.meter-ocr-toggle{display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer}.meter-ocr-box p{margin:0}.meter-ocr-history summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--muted)}.meter-ocr-summary{display:grid;gap:4px;margin:6px 0}
 @media(max-width:1080px){.meter-layout{grid-template-columns:minmax(0,1fr)}}
 `;

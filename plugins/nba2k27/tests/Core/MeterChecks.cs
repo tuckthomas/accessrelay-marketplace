@@ -200,6 +200,18 @@ internal static class MeterChecks
         if (!rhythmOnly.Accepted(p, settings)) throw new Exception("Three explicitly confirmed RHYTHM Excellent results without separate tempo could not calibrate.");
         var described = JsonSerializer.SerializeToElement(((IVisionCaptureProfile)p).DescribeLiveAssistance(settings with { PluginAssistance = rhythmOnly.Export() }));
         if (described.GetProperty("successfulTrials").GetInt32() != 3) throw new Exception("The practice counter disagreed with combined Rhythm acceptance.");
+        var smooth = config with { SmoothStroke = true, AnchorFraction = .85, StrokeDurationMs = 48, UpHoldMs = 0, Trigger = "largeRight" };
+        JsonElement Trajectory(NbaMeterSettings meter, double tempo) => JsonSerializer.SerializeToElement(
+            ((IVisionCaptureProfile)p).DescribeLiveAssistance(settings with { PluginAssistance = meter.Export(), TempoCorrectionMs = tempo }),
+            NbaMeterSettings.Json).GetProperty("stickTrajectory");
+        var graph = Trajectory(smooth, 6);
+        if (graph.GetProperty("durationMs").GetDouble() != 54 || graph.GetProperty("fullUpHoldMs").GetDouble() != 2
+            || graph.GetProperty("anchorFraction").GetDouble() != .85 || !graph.GetProperty("automaticDown").GetBoolean()
+            || !graph.GetProperty("smooth").GetBoolean() || graph.GetProperty("anchorTimeFraction").GetDouble() != smooth.Action(p, settings).AnchorTimeFraction)
+            throw new Exception("The trajectory disagrees with the adjusted rhythm action.");
+        if (Trajectory(config, -200).GetProperty("durationMs").GetDouble() != 8 || Trajectory(config, 0).GetProperty("automaticDown").GetBoolean()
+            || Trajectory(config with { InputMode = "button" }, 0).ValueKind != JsonValueKind.Null)
+            throw new Exception("The trajectory lost its duration limit or graphed a motion the assistant does not supply.");
         var timingOnly = config with { Results = [], Confirmed = true };
         var timingFeedback = JsonSerializer.SerializeToElement(new { timing = "excellent", tempo = "none", shotType = "timing" });
         for (int i = 201; i <= 203; i++) timingOnly = timingOnly.Feedback(p, settings, timingFeedback, Receipt(i), observation);
