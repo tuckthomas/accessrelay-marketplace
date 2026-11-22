@@ -23,6 +23,8 @@ describe('meter calibration workflow', () => {
     Object.assign(state.settings.pluginAssistance, { confirmed: true, calibrationTrial: false });
     const view = render(<Workspace mode="live" state={state} status={{}} command={command} />);
     const graph = () => screen.getByRole('img', { name: /upstroke takes 54 ms/ });
+    const workflow = screen.getByRole('heading', { name: 'Xbox stream statistics' }).closest('section')!.parentElement;
+    expect(graph().closest('section')!.parentElement).toBe(workflow);
     const curve = () => graph().querySelector('.nba-stick-timed path')!.getAttribute('d');
     expect(graph().getAttribute('aria-label')).toContain('release point is −4 ms');
     expect(graph().getAttribute('aria-label')).toContain('full up for 48 ms and returns to center');

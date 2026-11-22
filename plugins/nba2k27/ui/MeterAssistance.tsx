@@ -348,11 +348,74 @@ export function MeterAssistance({ state = {}, status, command, captureWindow, ed
       {s.lastAttempt?.outcome === 'cancelled' && <Notice>Attempt cancelled: {s.lastAttempt.cancellationReason}. {output.holdingCancelledTriggerShot ? 'Release the shot control to return the stick to neutral.' : 'No successful release was recorded.'}</Notice>}
     </Card>
     <div className="meter-layout">
-      <div className="meter-capture"><GameplayPreview status={s} window={captureWindow} onError={setError} actions={locked
+      <GameplayPreview status={s} window={captureWindow} onError={setError} actions={locked
         ? <Button active={!!session.running} disabled={!!s.stopping} onClick={() => void stopPreview()}>Stop preview</Button>
         : <Button active={false} disabled={working || !profile?.usesShotMeter || !source} busy={busy === 'start'} onClick={() => void preview()}>Start preview</Button>} />
-        {profile?.usesShotMeter && config.inputMode === 'rhythm' && calibration.stickTrajectory &&
-          <StickTrajectoryGraph stroke={calibration.stickTrajectory} correctionMs={strokeCorrection} />}
+      <div className="meter-controls">
+        <Card title={accepted ? 'Meter assistance' : 'Calibrate your shot'} className="meter-practice">
+          <div className="meter-readiness" aria-label="Connection readiness">
+            <div><span>Gameplay</span><strong>{session.sourceStale ? 'Stream paused' : session.running ? 'Capture running' : 'Preview stopped'}</strong></div>
+            <div><span>Controller output</span>{connected ? <strong className="meter-connected"><Icon name="check" size={17} />Connected</strong>
+              : <Button active={false} disabled={working || inputMissing} busy={busy === 'connectOutput'} onClick={() => void connect()}>{busy === 'connectOutput' ? 'Connecting…' : 'Connect controller'}</Button>}</div>
+          </div>
+          {error && <Notice tone="danger">{error}</Notice>}
+          {savedResult && (!signature || savedResult === signature) && resultMessage && <Notice tone="info">{resultMessage}</Notice>}
+          {adjustmentFailed && dirty && <Button disabled={working || !!output.armed} onClick={() => { void save(config, true).catch(() => {}); }}>Retry adjustment</Button>}
+          {!output.armed && !awaitingFeedback && <p role="status">{nextStep}</p>}
+          {output.armed ? <div className="stack"><Notice tone="info">{accepted ? 'Meter assistance is on.'
+            : config.activation === 'tap' || config.inputMode === 'button' ? `Take one stationary shot. ${activationHelp}`
+            : (config.trigger ?? 'largeRight') !== 'physicalStick'
+              ? `Take one stationary shot. Hold ${triggerLabels[config.trigger ?? 'largeRight'] ?? 'the assigned control'} down through the automatic reversal, then release it.${['rightUp', 'rightDown', 'rightLeft', 'rightRight'].includes(config.trigger) ? '' : ' Keep the right stick centered.'}`
+              : 'Take one stationary shot. Hold the right stick down through the automatic reversal, then return to neutral.'}</Notice>
+            {output.message && <p role="status">{output.message}</p>}
+            <Button active={true} onClick={() => void pauseAssistance()}>Pause {accepted ? 'assistance' : 'trial'}</Button></div>
+            : !awaitingFeedback && (accepted || successes < 3 || !matching) && <Button active={false} className="meter-primary" disabled={working || !ready} busy={busy === 'start' || busy === 'armedSet' || busy === 'signalConfigure'}
+              onClick={() => void begin()}>
+              <Icon name="play" size={18} />{accepted ? 'Start assistance' : 'Start practice trial'}</Button>}
+          {!accepted && <>
+            <div className="meter-progress" aria-label={`${successes} of 3 matching Excellent results`}><strong>{successes} of 3</strong><span>matching Excellent results</span></div>
+            {awaitingFeedback ? <div className="meter-feedback"><h3>What did NBA 2K27 report?</h3><p className="subtle">{config.inputMode === 'rhythm'
+              ? "Copy the game's feedback heading and result. RHYTHM Excellent counts without a separate tempo grade. TIMING alone does not confirm a rhythm shot."
+              : 'Enter the timing shown by the game. Saving adjusts the next trial; Excellent settings stay unchanged.'}</p>
+              {config.inputMode === 'rhythm' && <Field label="Feedback heading"><Select value={feedback.shotType} disabled={working}
+                onValueChange={v => setFeedback(old => ({ ...old, shotType: v, tempo: v === 'timing' ? 'none' : old.tempo || 'none' }))}>
+                <SelectOption value="" disabled>Choose heading…</SelectOption><SelectOption value="rhythm">RHYTHM</SelectOption><SelectOption value="timing">TIMING</SelectOption></Select></Field>}
+              <Field label="Shot timing"><Select value={feedback.timing} disabled={working} onValueChange={v => setFeedback(old => ({ ...old, timing: v }))}>
+                <SelectOption value="" disabled>Choose timing…</SelectOption>{timingOptions.map(([value, label]) => <SelectOption key={value} value={value}>{label}</SelectOption>)}</Select></Field>
+              {config.inputMode === 'rhythm' && <Field label="Shot tempo"><Select value={feedback.tempo} disabled={working || feedback.shotType === 'timing'} onValueChange={v => setFeedback(old => ({ ...old, tempo: v }))}>
+                <SelectOption value="" disabled>Choose tempo…</SelectOption>{tempoOptions.map(([value, label]) => <SelectOption key={value} value={value}>{label}</SelectOption>)}</Select></Field>}
+              <div className="button-group"><Button variant="primary" busy={busy === 'signalFeedback'} disabled={working || dirty || receipt?.eligibleForFeedback === false || !feedback.timing || (config.inputMode === 'rhythm' && (!feedback.shotType || !feedback.tempo))} onClick={() => void saveFeedbackWith()}>Save result</Button>
+                <Button disabled={working} onClick={() => { setSkipped(signature); setFeedback({ timing: '', tempo: '', shotType: '' }); }}>Skip this result</Button></div></div>
+              : <p className="subtle">{used ? 'Result saved. Start another practice trial when ready.' : 'Shot feedback appears here after Studio completes a controller action.'}</p>}
+            {successes >= 3 && <Button variant="primary" disabled={working || !matching || awaitingFeedback} onClick={() => void confirm()}>Save calibration</Button>}
+          </>}
+          {accepted && <p className="subtle">Calibration saved for this profile, capture size and timing setup.</p>}
+          <div className="meter-ocr-box">
+            <label className="meter-ocr-toggle"><Checkbox checked={config.autoOcrTiming !== false} disabled={working || !!output.armed}
+              onChange={e => { const next = { ...config, autoOcrTiming: e.target.checked }; setConfig(next); if (profile) void save(next, true).catch(() => {}); }} />
+              <span>Auto-adapt timing from shot feedback (OCR)</span></label>
+            {s.ocrReaderStatus && <p role="status">{s.ocrReaderStatus}{typeof s.ocrEffectiveTimingMs === 'number'
+              ? ` Current timing correction ${fmt(s.ocrEffectiveTimingMs)} ms.` : ''}</p>}
+            {!accepted && <label className="meter-ocr-toggle"><Checkbox checked={autoSubmitPractice} disabled={working || config.autoOcrTiming === false}
+              onChange={e => setAutoSubmitPractice(e.target.checked)} />
+              <span>Auto-save OCR practice results &amp; re-arm</span></label>}
+            {ocr?.message && <p className="subtle" role="status">{ocr.message}{ocr.distance || ocr.coverage ? ` [${[ocr.distance, ocr.coverage].filter(Boolean).join(' · ')}]` : ''}{ocr.rawText ? ` (${ocr.rawText})` : ''}</p>}
+            {Array.isArray(s.ocrHistory) && s.ocrHistory.length > 0 && <details className="meter-ocr-history"><summary>Shot feedback log ({s.ocrHistory.length})</summary>
+              <div className="meter-ocr-summary">{Object.entries(s.ocrHistory.reduce((acc: any, r: any) => {
+                const key = r.distance || 'Distance unknown';
+                const g = acc[key] ?? { total: 0, excellent: 0, early: 0, late: 0, fast: 0, slow: 0 };
+                g.total++;
+                if (r.timing === 'excellent') g.excellent++;
+                else if (r.timing === 'early' || r.timing === 'slightlyEarly') g.early++;
+                else if (r.timing === 'late' || r.timing === 'slightlyLate') g.late++;
+                if (r.tempo === 'fast' || r.tempo === 'slightlyFast') g.fast++;
+                else if (r.tempo === 'slow' || r.tempo === 'slightlySlow') g.slow++;
+                acc[key] = g;
+                return acc;
+              }, {})).map(([dist, g]: [string, any]) => <p key={dist} className="subtle">{dist}: {g.total} shots · {g.excellent} excellent · {g.early} early · {g.late} late · {g.fast} fast · {g.slow} slow</p>)}</div>
+              {s.ocrHistoryPath && <p className="subtle">Saved to {s.ocrHistoryPath}</p>}</details>}
+          </div>
+        </Card>
         <details className="meter-diagnostics"><summary>Detection details</summary><p role="status">{signal.message || 'Detection runs when you hold the shooting input.'}</p>
           <div className="meter-readings">{[['Fill', `${fmt(signal.progress * 100)}%`], ['Predicted target', `${fmt(signal.timeToTargetMs)} ms`],
             ['Fill velocity', signal.continueCommittedAction ? '—' : `${fmt(signal.velocityPerMs * 1000 * 100)}% / s`], ['Samples', signal.samples ?? 0],
@@ -375,71 +438,9 @@ export function MeterAssistance({ state = {}, status, command, captureWindow, ed
           {diagnostic?.failed && <Notice tone="danger">The diagnostic recording could not finish. Open its folder to inspect any saved evidence.</Notice>}
         </div></details>
       </div>
-      <Card title={accepted ? 'Meter assistance' : 'Calibrate your shot'} className="meter-practice">
-        <div className="meter-readiness" aria-label="Connection readiness">
-          <div><span>Gameplay</span><strong>{session.sourceStale ? 'Stream paused' : session.running ? 'Capture running' : 'Preview stopped'}</strong></div>
-          <div><span>Controller output</span>{connected ? <strong className="meter-connected"><Icon name="check" size={17} />Connected</strong>
-            : <Button active={false} disabled={working || inputMissing} busy={busy === 'connectOutput'} onClick={() => void connect()}>{busy === 'connectOutput' ? 'Connecting…' : 'Connect controller'}</Button>}</div>
-        </div>
-        {error && <Notice tone="danger">{error}</Notice>}
-        {savedResult && (!signature || savedResult === signature) && resultMessage && <Notice tone="info">{resultMessage}</Notice>}
-        {adjustmentFailed && dirty && <Button disabled={working || !!output.armed} onClick={() => { void save(config, true).catch(() => {}); }}>Retry adjustment</Button>}
-        {!output.armed && !awaitingFeedback && <p role="status">{nextStep}</p>}
-        {output.armed ? <div className="stack"><Notice tone="info">{accepted ? 'Meter assistance is on.'
-          : config.activation === 'tap' || config.inputMode === 'button' ? `Take one stationary shot. ${activationHelp}`
-          : (config.trigger ?? 'largeRight') !== 'physicalStick'
-            ? `Take one stationary shot. Hold ${triggerLabels[config.trigger ?? 'largeRight'] ?? 'the assigned control'} down through the automatic reversal, then release it.${['rightUp', 'rightDown', 'rightLeft', 'rightRight'].includes(config.trigger) ? '' : ' Keep the right stick centered.'}`
-            : 'Take one stationary shot. Hold the right stick down through the automatic reversal, then return to neutral.'}</Notice>
-          {output.message && <p role="status">{output.message}</p>}
-          <Button active={true} onClick={() => void pauseAssistance()}>Pause {accepted ? 'assistance' : 'trial'}</Button></div>
-          : !awaitingFeedback && (accepted || successes < 3 || !matching) && <Button active={false} className="meter-primary" disabled={working || !ready} busy={busy === 'start' || busy === 'armedSet' || busy === 'signalConfigure'}
-            onClick={() => void begin()}>
-            <Icon name="play" size={18} />{accepted ? 'Start assistance' : 'Start practice trial'}</Button>}
-        {!accepted && <>
-          <div className="meter-progress" aria-label={`${successes} of 3 matching Excellent results`}><strong>{successes} of 3</strong><span>matching Excellent results</span></div>
-          {awaitingFeedback ? <div className="meter-feedback"><h3>What did NBA 2K27 report?</h3><p className="subtle">{config.inputMode === 'rhythm'
-            ? "Copy the game's feedback heading and result. RHYTHM Excellent counts without a separate tempo grade. TIMING alone does not confirm a rhythm shot."
-            : 'Enter the timing shown by the game. Saving adjusts the next trial; Excellent settings stay unchanged.'}</p>
-            {config.inputMode === 'rhythm' && <Field label="Feedback heading"><Select value={feedback.shotType} disabled={working}
-              onValueChange={v => setFeedback(old => ({ ...old, shotType: v, tempo: v === 'timing' ? 'none' : old.tempo || 'none' }))}>
-              <SelectOption value="" disabled>Choose heading…</SelectOption><SelectOption value="rhythm">RHYTHM</SelectOption><SelectOption value="timing">TIMING</SelectOption></Select></Field>}
-            <Field label="Shot timing"><Select value={feedback.timing} disabled={working} onValueChange={v => setFeedback(old => ({ ...old, timing: v }))}>
-              <SelectOption value="" disabled>Choose timing…</SelectOption>{timingOptions.map(([value, label]) => <SelectOption key={value} value={value}>{label}</SelectOption>)}</Select></Field>
-            {config.inputMode === 'rhythm' && <Field label="Shot tempo"><Select value={feedback.tempo} disabled={working || feedback.shotType === 'timing'} onValueChange={v => setFeedback(old => ({ ...old, tempo: v }))}>
-              <SelectOption value="" disabled>Choose tempo…</SelectOption>{tempoOptions.map(([value, label]) => <SelectOption key={value} value={value}>{label}</SelectOption>)}</Select></Field>}
-            <div className="button-group"><Button variant="primary" busy={busy === 'signalFeedback'} disabled={working || dirty || receipt?.eligibleForFeedback === false || !feedback.timing || (config.inputMode === 'rhythm' && (!feedback.shotType || !feedback.tempo))} onClick={() => void saveFeedbackWith()}>Save result</Button>
-              <Button disabled={working} onClick={() => { setSkipped(signature); setFeedback({ timing: '', tempo: '', shotType: '' }); }}>Skip this result</Button></div></div>
-            : <p className="subtle">{used ? 'Result saved. Start another practice trial when ready.' : 'Shot feedback appears here after Studio completes a controller action.'}</p>}
-          {successes >= 3 && <Button variant="primary" disabled={working || !matching || awaitingFeedback} onClick={() => void confirm()}>Save calibration</Button>}
-        </>}
-        {accepted && <p className="subtle">Calibration saved for this profile, capture size and timing setup.</p>}
-        <div className="meter-ocr-box">
-          <label className="meter-ocr-toggle"><Checkbox checked={config.autoOcrTiming !== false} disabled={working || !!output.armed}
-            onChange={e => { const next = { ...config, autoOcrTiming: e.target.checked }; setConfig(next); if (profile) void save(next, true).catch(() => {}); }} />
-            <span>Auto-adapt timing from shot feedback (OCR)</span></label>
-          {s.ocrReaderStatus && <p role="status">{s.ocrReaderStatus}{typeof s.ocrEffectiveTimingMs === 'number'
-            ? ` Current timing correction ${fmt(s.ocrEffectiveTimingMs)} ms.` : ''}</p>}
-          {!accepted && <label className="meter-ocr-toggle"><Checkbox checked={autoSubmitPractice} disabled={working || config.autoOcrTiming === false}
-            onChange={e => setAutoSubmitPractice(e.target.checked)} />
-            <span>Auto-save OCR practice results &amp; re-arm</span></label>}
-          {ocr?.message && <p className="subtle" role="status">{ocr.message}{ocr.distance || ocr.coverage ? ` [${[ocr.distance, ocr.coverage].filter(Boolean).join(' · ')}]` : ''}{ocr.rawText ? ` (${ocr.rawText})` : ''}</p>}
-          {Array.isArray(s.ocrHistory) && s.ocrHistory.length > 0 && <details className="meter-ocr-history"><summary>Shot feedback log ({s.ocrHistory.length})</summary>
-            <div className="meter-ocr-summary">{Object.entries(s.ocrHistory.reduce((acc: any, r: any) => {
-              const key = r.distance || 'Distance unknown';
-              const g = acc[key] ?? { total: 0, excellent: 0, early: 0, late: 0, fast: 0, slow: 0 };
-              g.total++;
-              if (r.timing === 'excellent') g.excellent++;
-              else if (r.timing === 'early' || r.timing === 'slightlyEarly') g.early++;
-              else if (r.timing === 'late' || r.timing === 'slightlyLate') g.late++;
-              if (r.tempo === 'fast' || r.tempo === 'slightlyFast') g.fast++;
-              else if (r.tempo === 'slow' || r.tempo === 'slightlySlow') g.slow++;
-              acc[key] = g;
-              return acc;
-            }, {})).map(([dist, g]: [string, any]) => <p key={dist} className="subtle">{dist}: {g.total} shots · {g.excellent} excellent · {g.early} early · {g.late} late · {g.fast} fast · {g.slow} slow</p>)}</div>
-            {s.ocrHistoryPath && <p className="subtle">Saved to {s.ocrHistoryPath}</p>}</details>}
-        </div>
-      </Card>
     </div>
+    {profile?.usesShotMeter && config.inputMode === 'rhythm' && calibration.stickTrajectory &&
+      <StickTrajectoryGraph stroke={calibration.stickTrajectory} correctionMs={strokeCorrection} />}
     <details className="meter-advanced"><summary>Advanced settings</summary><Card title="Timing & detection">
       <label className="meter-ocr-toggle"><Checkbox checked={timing.streamTelemetry?.enabled !== false} disabled={working || !!output.armed}
         onChange={e => { setTiming((old: any) => ({ ...old, streamTelemetry: { ...meterArguments(config, old).streamTelemetry, enabled: e.target.checked } })); setDirty(true); }} />Monitor Xbox stream statistics</label>
@@ -492,21 +493,21 @@ export function MeterAssistance({ state = {}, status, command, captureWindow, ed
 
 const styles = `
 .meter-profile-row{display:flex;align-items:end;gap:16px;flex-wrap:wrap}.meter-profile-row>.field,.meter-profile-row>.profile-picker{flex:1;min-width:220px}.meter-copy-row{margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}.meter-profile-summary{margin:16px 0 0}
-.meter-layout{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(340px,.85fr);gap:20px;align-items:start}.meter-layout>*{min-width:0}.meter-capture{display:grid;gap:16px}
+.meter-layout{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(340px,.85fr);gap:20px;align-items:start}.meter-layout>*{min-width:0}.meter-controls{display:grid;gap:16px}
 .meter-readiness{display:grid;margin-bottom:16px}.meter-readiness>div{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:52px;padding:10px 0;border-bottom:1px solid var(--line)}
 .meter-connected{display:flex;align-items:center;gap:6px;color:var(--success)}.meter-primary{width:100%;margin:4px 0 12px}.meter-progress{display:flex;align-items:baseline;gap:10px;padding:16px 0;border-bottom:1px solid var(--line)}
 .meter-progress strong{font-size:24px}.meter-progress span{font-size:14px;color:var(--muted)}.meter-feedback{display:grid;gap:12px;margin-top:16px}.meter-feedback h3,.meter-feedback p{margin:0}
 .meter-diagnostics,.meter-advanced{border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:16px}.meter-diagnostics summary,.meter-advanced>summary{cursor:pointer;font-weight:600;font-size:14px}
 .meter-advanced[open]>summary{margin-bottom:16px}.meter-advanced>.card{border:0;padding:8px 0 0}.meter-readings{display:grid;grid-template-columns:repeat(auto-fit,minmax(115px,1fr));gap:12px;margin-top:16px}
 .meter-readings>div{display:grid;gap:6px}.meter-readings span{font-size:14px;color:var(--muted)}
-.nba-stick-graph{margin:0;font-size:14px;font-variant-numeric:tabular-nums}
+.nba-stick-graph{container-type:inline-size;margin:0;font-size:clamp(14px,1vw,16px);font-variant-numeric:tabular-nums}
 .nba-stick-key{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px 16px;color:var(--ink)}
-.nba-stick-key span:last-child{display:inline-flex;align-items:center;gap:7px}.nba-stick-key i,.nba-stick-anchor{width:9px;height:9px;border-radius:50%;background:var(--roi-feedback);box-shadow:0 0 0 2px var(--surface)}
-.nba-stick-chart{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:12px;margin:22px 16px 0 0}
-.nba-stick-levels,.nba-stick-grid{position:relative;height:112px}.nba-stick-levels{width:8ch;color:var(--muted)}
+.nba-stick-key span:last-child{display:inline-flex;align-items:center;gap:7px}.nba-stick-key i,.nba-stick-anchor{width:11px;height:11px;border-radius:50%;background:var(--roi-feedback);box-shadow:0 0 0 2px var(--surface)}
+.nba-stick-chart{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:12px;height:clamp(190px,25cqi,360px);margin:24px 18px 0 0}
+.nba-stick-levels,.nba-stick-grid{position:relative}.nba-stick-levels{width:8ch;color:var(--muted)}
 .nba-stick-levels span{position:absolute;right:0;transform:translateY(-50%);white-space:nowrap}.nba-stick-levels span:nth-child(2){top:50%}.nba-stick-levels span:last-child{top:100%}
 .nba-stick-grid{display:flex;box-shadow:inset 0 1px var(--line),inset 0 -1px var(--line)}.nba-stick-grid::before{content:"";position:absolute;top:50%;width:100%;border-top:1px dashed var(--line)}
-.nba-stick-lead,.nba-stick-timed{position:relative}.nba-stick-lead{width:16%;max-width:74px}.nba-stick-timed{flex:1;min-width:0}
+.nba-stick-lead,.nba-stick-timed{position:relative}.nba-stick-lead{flex:0 0 clamp(52px,10%,84px)}.nba-stick-timed{flex:1;min-width:0}
 .nba-stick-graph svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
 .nba-stick-curve,.nba-stick-break{fill:none;stroke:var(--accent);stroke-width:3;stroke-linejoin:round;vector-effect:non-scaling-stroke}.nba-stick-break{stroke:var(--muted);stroke-width:1.5}
 .nba-stick-tick{position:absolute;height:100%;border-left:1px dotted var(--line)}.nba-stick-tick span,.nba-stick-onset{position:absolute;top:100%;margin-top:7px;color:var(--muted)}
